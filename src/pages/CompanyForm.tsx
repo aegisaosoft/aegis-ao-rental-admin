@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
@@ -54,13 +54,7 @@ const CompanyForm: React.FC = () => {
     stripeAccountId: ''
   });
 
-  useEffect(() => {
-    if (id) {
-      loadCompany();
-    }
-  }, [id]);
-
-  const loadCompany = async () => {
+  const loadCompany = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -72,7 +66,13 @@ const CompanyForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadCompany();
+    }
+  }, [id, loadCompany]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
@@ -22,11 +22,7 @@ const CompanyList: React.FC = () => {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
 
-  useEffect(() => {
-    loadCompanies();
-  }, [includeInactive]);
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -38,9 +34,13 @@ const CompanyList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [includeInactive]);
 
-  const handleDelete = async (id: string, companyName: string) => {
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
+
+  const handleDelete = useCallback(async (id: string, companyName: string) => {
     if (!window.confirm(`Are you sure you want to delete ${companyName}?`)) {
       return;
     }
@@ -52,7 +52,7 @@ const CompanyList: React.FC = () => {
     } catch (err: any) {
       alert('Failed to delete company: ' + err.message);
     }
-  };
+  }, [loadCompanies]);
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
@@ -156,7 +156,7 @@ const CompanyList: React.FC = () => {
         ),
       },
     ],
-    [navigate]
+    [navigate, handleDelete]
   );
 
   const table = useReactTable({
