@@ -1,6 +1,23 @@
-# Getting Started with Create React App
+# Aegis AO Rental Admin
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Aegis AO Rental Admin Dashboard - React TypeScript application for managing the Aegis AO rental platform.
+
+## Features
+
+- **Authentication**: Login with user ID and password from `aegis_users` table
+- **Protected Routes**: Dashboard requires authentication
+- **Modern UI**: Clean, responsive design with Tailwind CSS
+- **Completely Independent**: Standalone React app with its own routing and state management
+
+## Environment Configuration
+
+### Development
+- Admin Frontend: `https://localhost:4000/`
+- API Backend: `https://localhost:7163/api`
+
+### Production
+- Frontend: Azure deployment
+- API: `https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net/api`
 
 ## Available Scripts
 
@@ -9,15 +26,10 @@ In the project directory, you can run:
 ### `npm start`
 
 Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Open [https://localhost:4000](https://localhost:4000) to view it in the browser.
 
 The page will reload if you make edits.\
 You will also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
 ### `npm run build`
 
@@ -27,20 +39,45 @@ It correctly bundles React in production mode and optimizes the build for the be
 The build is minified and the filenames include the hashes.\
 Your app is ready to be deployed!
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### `npm test`
 
-### `npm run eject`
+Launches the test runner in the interactive watch mode.\
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Project Structure
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+src/
+├── context/
+│   └── AuthContext.tsx      # Authentication context and state management
+├── pages/
+│   ├── Login.tsx            # Login page
+│   └── Dashboard.tsx        # Main dashboard (protected route)
+├── services/
+│   └── api.ts              # Axios configuration and interceptors
+├── App.tsx                 # Main app component with routing
+├── index.tsx               # Entry point
+└── index.css              # Global styles with Tailwind
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Authentication
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+The admin app authenticates against the `aegis_users` table using:
+- **Endpoint**: `/api/aegis-admin/login`
+- **Fields**: `userId` and `password`
+- **Roles**: `agent` or `admin`
+
+JWT tokens are stored in localStorage and automatically included in API requests.
+
+## API Integration
+
+All API calls go through the configured API URL:
+- Uses environment variables: `REACT_APP_API_URL`
+- Automatic token injection via axios interceptors
+- Error handling with 401 redirect to login
 
 ## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- [React Documentation](https://reactjs.org/)
+- [React Router](https://reactrouter.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Axios](https://axios-http.com/)
