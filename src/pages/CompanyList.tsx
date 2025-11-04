@@ -91,11 +91,16 @@ const CompanyList: React.FC = () => {
       {
         accessorKey: 'subdomain',
         header: 'Subdomain',
-        cell: (info) => (
-          <code className="px-2 py-1 bg-gray-100 rounded text-sm">
-            {info.getValue() as string}
-          </code>
-        ),
+        cell: (info) => {
+          const subdomain = info.getValue() as string | null | undefined;
+          return subdomain ? (
+            <code className="px-2 py-1 bg-gray-100 rounded text-sm">
+              {subdomain}
+            </code>
+          ) : (
+            <span className="text-gray-400 italic text-sm">Not set</span>
+          );
+        },
       },
       {
         accessorKey: 'fullDomain',

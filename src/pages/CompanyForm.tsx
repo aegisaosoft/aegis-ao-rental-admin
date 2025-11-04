@@ -34,12 +34,13 @@ const CompanyForm: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Company>>({
     companyName: '',
     email: '',
-    subdomain: '',
+    subdomain: undefined, // Optional - can be set manually
     primaryColor: '#007bff',
     secondaryColor: '#6c757d',
     logoUrl: '',
     faviconUrl: '',
     country: '',
+    language: 'en',
     motto: '',
     mottoDescription: '',
     about: '',
@@ -51,7 +52,8 @@ const CompanyForm: React.FC = () => {
     invitation: '',
     bookingIntegrated: false,
     taxId: '',
-    stripeAccountId: ''
+    stripeAccountId: '',
+    isActive: true
   });
 
   const loadCompany = useCallback(async () => {
@@ -80,17 +82,40 @@ const CompanyForm: React.FC = () => {
     setError(null);
 
     try {
+      // Prepare data - convert empty strings to null for optional fields
+      const submitData = {
+        ...formData,
+        // Convert empty strings to null/undefined for optional fields
+        subdomain: formData.subdomain && formData.subdomain.trim() ? formData.subdomain.trim().toLowerCase() : undefined,
+        logoUrl: formData.logoUrl && formData.logoUrl.trim() ? formData.logoUrl : undefined,
+        faviconUrl: formData.faviconUrl && formData.faviconUrl.trim() ? formData.faviconUrl : undefined,
+        country: formData.country && formData.country.trim() ? formData.country : undefined,
+        language: formData.language && formData.language.trim() ? formData.language : undefined,
+        motto: formData.motto && formData.motto.trim() ? formData.motto : undefined,
+        mottoDescription: formData.mottoDescription && formData.mottoDescription.trim() ? formData.mottoDescription : undefined,
+        about: formData.about && formData.about.trim() ? formData.about : undefined,
+        website: formData.website && formData.website.trim() ? formData.website : undefined,
+        customCss: formData.customCss && formData.customCss.trim() ? formData.customCss : undefined,
+        videoLink: formData.videoLink && formData.videoLink.trim() ? formData.videoLink : undefined,
+        bannerLink: formData.bannerLink && formData.bannerLink.trim() ? formData.bannerLink : undefined,
+        backgroundLink: formData.backgroundLink && formData.backgroundLink.trim() ? formData.backgroundLink : undefined,
+        invitation: formData.invitation && formData.invitation.trim() ? formData.invitation : undefined,
+        taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
+        stripeAccountId: formData.stripeAccountId && formData.stripeAccountId.trim() ? formData.stripeAccountId : undefined,
+      };
+
       if (id) {
-        await companyService.updateCompany(id, formData);
+        await companyService.updateCompany(id, submitData);
         alert('Company updated successfully!');
       } else {
-        await companyService.createCompany(formData);
-        alert('Company created successfully!\n\nNext steps:\n1. Add DNS CNAME record\n2. Add DNS TXT record for verification\n3. Configure custom domain in Azure\n4. Set up SSL certificate');
+        await companyService.createCompany(submitData);
+        alert('Company created successfully!\n\nNext steps:\n1. Set subdomain manually if not set\n2. Add DNS CNAME record (if subdomain set)\n3. Configure custom domain in Azure\n4. Set up SSL certificate');
       }
       navigate('/companies');
     } catch (err: any) {
       console.error('Failed to save company:', err);
-      setError(err.response?.data?.error || err.message || 'Failed to save company');
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save company';
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -180,7 +205,7 @@ const CompanyForm: React.FC = () => {
 
               <div>
                 <label htmlFor="subdomain" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subdomain <span className="text-red-600">*</span>
+                  Subdomain <span className="text-gray-500 text-xs">(Optional - can be set manually)</span>
                 </label>
                 <div className="flex items-center">
                 <input
@@ -190,7 +215,6 @@ const CompanyForm: React.FC = () => {
                   value={formData.subdomain || ''}
                   onChange={handleChange}
                   pattern="[a-z0-9-]+"
-                  required
                   placeholder="company"
                   className="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -199,7 +223,7 @@ const CompanyForm: React.FC = () => {
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-gray-500">
-                  Lowercase letters, numbers, and hyphens only.
+                  Lowercase letters, numbers, and hyphens only. Leave empty to set later.
                 </p>
               </div>
 
@@ -350,6 +374,202 @@ const CompanyForm: React.FC = () => {
               />
               {formData.bannerLink && (
                 <img src={formData.bannerLink} alt="Banner preview" className="mt-2 w-full max-w-2xl h-48 object-cover border border-gray-300 rounded" />
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="backgroundLink" className="block text-sm font-medium text-gray-700 mb-2">
+                Background Image URL
+              </label>
+              <input
+                type="url"
+                id="backgroundLink"
+                name="backgroundLink"
+                value={formData.backgroundLink || ''}
+                onChange={handleChange}
+                placeholder="https://example.com/background.jpg"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="videoLink" className="block text-sm font-medium text-gray-700 mb-2">
+                Video Link
+              </label>
+              <input
+                type="url"
+                id="videoLink"
+                name="videoLink"
+                value={formData.videoLink || ''}
+                onChange={handleChange}
+                placeholder="https://youtube.com/watch?v=..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </section>
+
+          {/* Content & Messaging */}
+          <section className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Content & Messaging</h2>
+            
+            <div>
+              <label htmlFor="motto" className="block text-sm font-medium text-gray-700 mb-2">
+                Motto
+              </label>
+              <input
+                type="text"
+                id="motto"
+                name="motto"
+                value={formData.motto || ''}
+                onChange={handleChange}
+                placeholder="e.g., Your Trusted Rental Partner"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="mottoDescription" className="block text-sm font-medium text-gray-700 mb-2">
+                Motto Description
+              </label>
+              <textarea
+                id="mottoDescription"
+                name="mottoDescription"
+                value={formData.mottoDescription || ''}
+                onChange={handleChange}
+                rows={2}
+                placeholder="e.g., Providing quality rental services since 2024"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="invitation" className="block text-sm font-medium text-gray-700 mb-2">
+                Invitation Text
+              </label>
+              <input
+                type="text"
+                id="invitation"
+                name="invitation"
+                value={formData.invitation || ''}
+                onChange={handleChange}
+                placeholder="e.g., Find & Book a Great Deal Today"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="about" className="block text-sm font-medium text-gray-700 mb-2">
+                About
+              </label>
+              <textarea
+                id="about"
+                name="about"
+                value={formData.about || ''}
+                onChange={handleChange}
+                rows={4}
+                placeholder="Company description..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-2">
+                Website URL
+              </label>
+              <input
+                type="url"
+                id="website"
+                name="website"
+                value={formData.website || ''}
+                onChange={handleChange}
+                placeholder="https://company.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="customCss" className="block text-sm font-medium text-gray-700 mb-2">
+                Custom CSS
+              </label>
+              <textarea
+                id="customCss"
+                name="customCss"
+                value={formData.customCss || ''}
+                onChange={handleChange}
+                rows={6}
+                placeholder="Custom CSS styles..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Advanced: Add custom CSS to override default styles
+              </p>
+            </div>
+          </section>
+
+          {/* Business Information */}
+          <section className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Business Information</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 mb-2">
+                  Tax ID
+                </label>
+                <input
+                  type="text"
+                  id="taxId"
+                  name="taxId"
+                  value={formData.taxId || ''}
+                  onChange={handleChange}
+                  placeholder="12-3456789"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="stripeAccountId" className="block text-sm font-medium text-gray-700 mb-2">
+                  Stripe Account ID
+                </label>
+                <input
+                  type="text"
+                  id="stripeAccountId"
+                  name="stripeAccountId"
+                  value={formData.stripeAccountId || ''}
+                  onChange={handleChange}
+                  placeholder="acct_1234567890"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Settings */}
+          <section className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Settings</h2>
+            
+            <div className="space-y-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="bookingIntegrated"
+                  checked={formData.bookingIntegrated || false}
+                  onChange={handleChange}
+                  className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-gray-700">Booking Integrated</span>
+              </label>
+
+              {id && (
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={formData.isActive !== undefined ? formData.isActive : true}
+                    onChange={handleChange}
+                    className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700">Active</span>
+                </label>
               )}
             </div>
           </section>

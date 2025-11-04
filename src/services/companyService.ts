@@ -4,7 +4,7 @@ interface Company {
   id: string;
   companyName: string;
   email: string;
-  subdomain: string;
+  subdomain?: string | null; // Optional - can be set manually
   fullDomain?: string;
   primaryColor: string;
   secondaryColor: string;
@@ -25,7 +25,8 @@ interface Company {
   taxId?: string;
   stripeAccountId?: string;
   isActive: boolean;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 class CompanyService {
@@ -79,7 +80,8 @@ class CompanyService {
   async updateCompany(id: string, companyData: Partial<Company>): Promise<Company> {
     try {
       const response = await api.put(`/companies/${id}`, companyData);
-      return response.data;
+      // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
+      return response.data.result || response.data;
     } catch (error) {
       console.error(`Failed to update company ${id}:`, error);
       throw error;
