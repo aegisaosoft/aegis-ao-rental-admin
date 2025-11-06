@@ -53,6 +53,7 @@ const CompanyForm: React.FC = () => {
     bookingIntegrated: false,
     taxId: '',
     stripeAccountId: '',
+    blinkKey: '',
     isActive: true
   });
 
@@ -102,6 +103,7 @@ const CompanyForm: React.FC = () => {
         invitation: formData.invitation && formData.invitation.trim() ? formData.invitation : undefined,
         taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
         stripeAccountId: formData.stripeAccountId && formData.stripeAccountId.trim() ? formData.stripeAccountId : undefined,
+        blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
       };
 
       if (id) {
@@ -539,6 +541,24 @@ const CompanyForm: React.FC = () => {
                   placeholder="acct_1234567890"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="blinkKey" className="block text-sm font-medium text-gray-700 mb-2">
+                  BlinkID License Key
+                </label>
+                <textarea
+                  id="blinkKey"
+                  name="blinkKey"
+                  value={formData.blinkKey || ''}
+                  onChange={handleChange}
+                  rows={3}
+                  placeholder="Enter BlinkID license key for this company domain"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Domain-specific BlinkID license key for driver license scanning
+                </p>
               </div>
             </div>
           </section>

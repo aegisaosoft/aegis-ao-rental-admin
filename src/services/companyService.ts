@@ -24,6 +24,7 @@ interface Company {
   bookingIntegrated?: boolean;
   taxId?: string;
   stripeAccountId?: string;
+  blinkKey?: string; // BlinkID license key for the company
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;

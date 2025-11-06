@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CompanyList from './pages/CompanyList';
 import CompanyForm from './pages/CompanyForm';
+import ScrollToTop from './components/ScrollToTop';
 import './App.css';
 
 // Protected route component
@@ -26,6 +27,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
