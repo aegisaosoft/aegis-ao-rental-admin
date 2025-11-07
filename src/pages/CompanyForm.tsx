@@ -24,12 +24,671 @@ const countriesByContinent = {
   ]
 };
 
+// Languages used in aegis-rental-www
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'pt', name: 'Português', flag: '🇧🇷' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' }
+];
+
+const SVG_ICON_OPTIONS: { value: string; label: string }[] = [
+  {
+    label: 'Star',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.25l2.574 5.215 5.756.837-4.165 4.06.983 5.73L12 16.9l-5.148 2.192.983-5.73-4.165-4.06 5.756-.837L12 3.25z"/></svg>'
+  },
+  {
+    label: 'Shield',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.25l8 3v6.112c0 4.213-2.732 8.186-6.825 9.753a2.5 2.5 0 0 1-1.75 0C6.332 19.548 3.6 15.575 3.6 11.362V5.25l8-3z"/></svg>'
+  },
+  {
+    label: 'Car',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6.5 4.5h11l2 6.5v7c0 .552-.448 1-1 1h-1a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1h-1c-.552 0-1-.448-1-1v-7l2-6.5zm1.3 2L6.3 10.5h11.4L16.2 6.5H7.8zM8 13.5a1.5 1.5 0 1 0 0 3h.01a1.5 1.5 0 0 0 0-3H8zm8 0a1.5 1.5 0 1 0 0 3h.01a1.5 1.5 0 0 0 0-3H16z"/></svg>'
+  },
+  {
+    label: 'Check',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20.285 6.707l-11 11a1 1 0 0 1-1.414 0l-4.5-4.5 1.414-1.414L8.5 15.086l10.293-10.293 1.492 1.914z"/></svg>'
+  },
+  {
+    label: 'Discount',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4.5 5.25a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H14l-2 3-2-3h-2.5a3 3 0 0 1-3-3v-9zM9 8.25a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-6.75 3.5l7.5-7.5-1.5-1.5-7.5 7.5 1.5 1.5z"/></svg>'
+  },
+  {
+    label: 'Fuel',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3.75h6a1.5 1.5 0 0 1 1.5 1.5v13.5H5.5V5.25A1.5 1.5 0 0 1 7 3.75zm10 3h1a1 1 0 0 1 1 1v9.689a1.75 1.75 0 1 1-1.5 0V8.75h-.5a1 1 0 0 1-1-1v-3a1 1 0 1 1 2 0v2z"/></svg>'
+  },
+  {
+    label: 'Road',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 3h8l3 18h-4l-1-6h-4l-1 6H5l3-18zm4 6l-.5-3h-1l-.5 3h2zm.5 3h-3l-.5 3h4l-.5-3z"/></svg>'
+  },
+  {
+    label: 'Location',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.25a7.25 7.25 0 0 0-7.25 7.25c0 4.582 5.53 9.954 6.92 11.238a.5.5 0 0 0 .66 0c1.39-1.284 6.92-6.656 6.92-11.238A7.25 7.25 0 0 0 12 2.25zm0 9.5a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5z"/></svg>'
+  },
+  {
+    label: 'Heart',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-6.5-4.35-9-8.4A5.25 5.25 0 0 1 7.77 3.62a4.2 4.2 0 0 1 4.23 1.93 4.2 4.2 0 0 1 4.23-1.93 5.25 5.25 0 0 1 4.77 8.98C18.5 16.65 12 21 12 21z"/></svg>'
+  },
+  {
+    label: 'Car Profile',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 9.5h1.2l1.4-3.5h10.8l1.4 3.5H20a2 2 0 0 1 2 2v4.75a1.75 1.75 0 0 1-3.5 0V15h-1v1.25a1.75 1.75 0 0 1-3.5 0V15H10v1.25a1.75 1.75 0 0 1-3.5 0V15h-1v1.25a1.75 1.75 0 1 1-3.5 0V11.5a2 2 0 0 1 2-2zm4.25 4.25a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm7.5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>'
+  },
+  {
+    label: 'Watch',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2h6l.75 3h.75a2.5 2.5 0 0 1 2.5 2.5v9a2.5 2.5 0 0 1-2.5 2.5h-.75L15 22H9l-.75-3H7.5A2.5 2.5 0 0 1 5 16.5v-9A2.5 2.5 0 0 1 7.5 5h.75L9 2zm3 5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 1.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm-.75 1.5v2.25l1.75 1.05.75-1.23-1.25-.75V10H11.25z"/></svg>'
+  },
+  {
+    label: 'Stopwatch',
+    value: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 1.5h3v1.5H16v1.5h-7V3h1.5V1.5zM12 6.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 1.5a5 5 0 1 0 .001 10.001A5 5 0 0 0 12 8zm-.75 1.5h1.5v3.25l2.25 1.3-.75 1.3-3-1.75V9.5z"/></svg>'
+  }
+];
+
+// Interface for language text object
+interface SectionNotePicture {
+  url: string;
+}
+
+interface SectionNote {
+  picture: SectionNotePicture;
+  caption: string;
+  symbolForeColor: string;
+  symbol: string;
+  text: string;
+  foreColor: string;
+  backColor: string;
+}
+
+interface LanguageSection {
+  title: string;
+  description: string;
+  backColor: string;
+  foreColor: string;
+  notesLayout: 'vertical' | 'horizontal';
+  notes: SectionNote[];
+}
+
+interface LanguageText {
+  language: string;
+  sections: LanguageSection[];
+}
+
+const createEmptyNote = (): SectionNote => ({
+  picture: { url: '' },
+  caption: '',
+  symbolForeColor: '#1f2937',
+  symbol: '',
+  text: '',
+  foreColor: '',
+  backColor: ''
+});
+
+const createEmptySection = (): LanguageSection => ({
+  title: '',
+  description: '',
+  backColor: '#ffffff',
+  foreColor: '#000000',
+  notesLayout: 'vertical',
+  notes: [createEmptyNote()]
+});
+
+const normalizePicture = (picture: any): SectionNotePicture => {
+  if (picture && typeof picture === 'object') {
+    if (typeof picture.url === 'string') {
+      return { url: picture.url };
+    }
+    if (typeof picture.picturePng === 'string') {
+      return { url: picture.picturePng };
+    }
+  }
+  if (typeof picture === 'string') {
+    return { url: picture };
+  }
+  return { url: '' };
+};
+
+// Parse JSON string to array, or initialize with default structure
+const parseTexts = (jsonString?: string): LanguageText[] => {
+  if (!jsonString || jsonString.trim() === '') {
+    // Return default structure with all languages
+    return LANGUAGES.map(lang => ({
+      language: lang.code,
+      sections: [createEmptySection()]
+    })) as LanguageText[];
+  }
+  
+  try {
+    const parsed = JSON.parse(jsonString);
+    if (Array.isArray(parsed)) {
+      const texts: LanguageText[] = parsed.map((item: any) => {
+        // Backwards compatibility: if title/description exist directly, wrap into sections array
+        if (item && Array.isArray(item.sections)) {
+          const sections = item.sections.map((section: any): LanguageSection => ({
+            title: section?.title ?? '',
+            description: section?.description ?? '',
+            backColor: section?.backColor ?? '#ffffff',
+            foreColor: section?.foreColor ?? '#000000',
+            notesLayout: section?.notesLayout == 'horizontal' ? 'horizontal' : 'vertical',
+            notes: Array.isArray(section?.notes) && section.notes.length > 0
+              ? section.notes.map((note: any): SectionNote => ({
+                  picture: normalizePicture(note?.picture ?? note?.picturePng ?? ''),
+                  caption: note?.caption ?? '',
+                  symbolForeColor: note?.symbolForeColor ?? '#1f2937',
+                  symbol: note?.symbol ?? '',
+                  text: note?.text ?? '',
+                  foreColor: note?.foreColor ?? '',
+                  backColor: note?.backColor ?? ''
+                }))
+              : [createEmptyNote()]
+          }));
+          return {
+            language: item.language ?? 'en',
+            sections: sections.length > 0 ? sections : [createEmptySection()]
+          };
+        }
+
+        return {
+          language: item?.language ?? 'en',
+          sections: [
+            {
+              title: item?.title ?? '',
+              description: item?.description ?? '',
+              backColor: item?.backColor ?? '#ffffff',
+              foreColor: item?.foreColor ?? '#000000',
+              notesLayout: item?.notesLayout == 'horizontal' ? 'horizontal' : 'vertical',
+              notes: [
+                {
+                  ...createEmptyNote(),
+                  picture: normalizePicture(item?.picture ?? item?.picturePng ?? ''),
+                  caption: item?.caption ?? '',
+                  symbolForeColor: item?.symbolForeColor ?? '#1f2937',
+                  symbol: item?.symbol ?? '',
+                  text: item?.text ?? '',
+                  foreColor: item?.foreColor ?? '',
+                  backColor: item?.backColor ?? ''
+                }
+              ]
+            }
+          ]
+        };
+      });
+
+      // Ensure all languages are present
+      const existingLanguages = texts.map((item) => item.language);
+      LANGUAGES.forEach(lang => {
+        if (!existingLanguages.includes(lang.code)) {
+          texts.push({
+            language: lang.code,
+            sections: [createEmptySection()]
+          });
+        }
+      });
+
+      return texts;
+    }
+    // If not an array, return default
+    return LANGUAGES.map(lang => ({
+      language: lang.code,
+      sections: [createEmptySection()]
+    }));
+  } catch (e) {
+    console.error('Failed to parse texts JSON:', e);
+    // Return default structure on parse error
+    return LANGUAGES.map(lang => ({
+      language: lang.code,
+      sections: [createEmptySection()]
+    }));
+  }
+};
+
+// LanguageTextEditor Component - Shows one language at a time
+interface LanguageTextEditorProps {
+  languageCode: string;
+  value?: string;
+  onChange: (value: string) => void;
+}
+
+const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, value, onChange }) => {
+  const [texts, setTexts] = useState<LanguageText[]>(() => parseTexts(value));
+  // Update local state when value prop or languageCode changes
+  useEffect(() => {
+    setTexts(parseTexts(value));
+  }, [value, languageCode]);
+
+  // Get current language data
+  // Language code comes from active tab selection and is not editable
+  const currentLang = LANGUAGES.find(l => l.code === languageCode) || LANGUAGES[0];
+  const textData = texts.find(t => t.language === languageCode) || {
+    language: languageCode, // Always use languageCode from props (read-only)
+    sections: [createEmptySection()]
+  };
+
+  const handleSectionsUpdate = (sections: LanguageSection[]) => {
+    const updated = texts.map(item =>
+      item.language === languageCode
+        ? { ...item, language: languageCode, sections }
+        : item
+    );
+
+    // Ensure the current language exists (using languageCode from props)
+    const currentLangExists = updated.some(item => item.language === languageCode);
+    if (!currentLangExists) {
+      updated.push({
+        language: languageCode, // Use languageCode from props, not from data
+        sections: sections.length > 0 ? sections : [createEmptySection()]
+      });
+    }
+    
+    // Ensure all languages are present (using language codes from LANGUAGES constant)
+    const existingLanguages = updated.map(item => item.language);
+    LANGUAGES.forEach(lang => {
+      if (!existingLanguages.includes(lang.code)) {
+        updated.push({
+          language: lang.code, // Use language code from constant, not editable
+          sections: [createEmptySection()]
+        });
+      }
+    });
+    
+    setTexts(updated);
+    
+    // Convert back to JSON string and notify parent
+    try {
+      const jsonString = JSON.stringify(updated, null, 2);
+      onChange(jsonString);
+    } catch (e) {
+      console.error('Failed to stringify texts:', e);
+    }
+  };
+
+  const handleSectionChange = (index: number, field: 'title' | 'description', value: string) => {
+    const sections = [...textData.sections];
+    sections[index] = {
+      ...sections[index],
+      [field]: value
+    };
+    handleSectionsUpdate(sections);
+  };
+
+  const handleSectionColorChange = (index: number, field: 'backColor' | 'foreColor', value: string) => {
+    const sections = [...textData.sections];
+    sections[index] = {
+      ...sections[index],
+      [field]: value
+    };
+    handleSectionsUpdate(sections);
+  };
+
+  const handleSectionLayoutChange = (index: number, value: 'vertical' | 'horizontal') => {
+    const sections = [...textData.sections];
+    sections[index] = {
+      ...sections[index],
+      notesLayout: value
+    };
+    handleSectionsUpdate(sections);
+  };
+
+  const handleAddSection = () => {
+    const sections = [...textData.sections, createEmptySection()];
+    handleSectionsUpdate(sections);
+  };
+
+  const handleRemoveSection = (index: number) => {
+    const sections = textData.sections.filter((_, i) => i !== index);
+    handleSectionsUpdate(sections.length > 0 ? sections : [createEmptySection()]);
+  };
+
+  const handleNoteChange = (
+    sectionIndex: number,
+    noteIndex: number,
+    field: 'symbol' | 'symbolForeColor' | 'text' | 'foreColor' | 'backColor' | 'caption',
+    value: string
+  ) => {
+    const sections = textData.sections.map((section, idx) => {
+      if (idx !== sectionIndex) return section;
+      const notes = section.notes.map((note, nIdx) =>
+        nIdx === noteIndex ? { ...note, [field]: value } : note
+      );
+      return { ...section, notes };
+    });
+    handleSectionsUpdate(sections);
+  };
+
+  const handlePictureChange = (sectionIndex: number, noteIndex: number, value: string) => {
+    const sections = textData.sections.map((section, idx) => {
+      if (idx !== sectionIndex) return section;
+      const notes = section.notes.map((note, nIdx) =>
+        nIdx === noteIndex ? { ...note, picture: { url: value } } : note
+      );
+      return { ...section, notes };
+    });
+    handleSectionsUpdate(sections);
+  };
+
+  const handleAddNote = (sectionIndex: number) => {
+    const sections = textData.sections.map((section, idx) => {
+      if (idx !== sectionIndex) return section;
+      return {
+        ...section,
+        notes: [...section.notes, createEmptyNote()]
+      };
+    });
+    handleSectionsUpdate(sections);
+  };
+
+  const handleRemoveNote = (sectionIndex: number, noteIndex: number) => {
+    const sections = textData.sections.map((section, idx) => {
+      if (idx !== sectionIndex) return section;
+      const notes = section.notes.filter((_, nIdx) => nIdx !== noteIndex);
+      return {
+        ...section,
+        notes: notes.length > 0 ? notes : [createEmptyNote()]
+      };
+    });
+    handleSectionsUpdate(sections);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xl font-semibold text-gray-800">
+        <span className="text-2xl">{currentLang.flag}</span>
+        <span>{currentLang.name}</span>
+      </div>
+
+      <div className="space-y-6">
+        {textData.sections.map((section, index) => (
+          <div key={`${languageCode}-section-${index}`} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-md font-semibold text-gray-700">Section {index + 1}</h4>
+              <button
+                type="button"
+                onClick={() => handleRemoveSection(index)}
+                className="text-sm text-red-600 hover:text-red-700 disabled:text-gray-400"
+                disabled={textData.sections.length === 1}
+              >
+                Delete
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={section.title}
+                  onChange={(e) => handleSectionChange(index, 'title', e.target.value)}
+                  placeholder={`Enter section title in ${currentLang.name}`}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={section.description}
+                  onChange={(e) => handleSectionChange(index, 'description', e.target.value)}
+                  placeholder={`Enter section description in ${currentLang.name}`}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Section Background Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={section.backColor && /^#([0-9A-Fa-f]{6})$/.test(section.backColor) ? section.backColor : '#ffffff'}
+                      onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
+                      className="h-10 w-12 border border-gray-300 rounded"
+                    />
+                    <input
+                      type="text"
+                      value={section.backColor}
+                      onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
+                      placeholder="#FFFFFF"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Section Foreground Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={section.foreColor && /^#([0-9A-Fa-f]{6})$/.test(section.foreColor) ? section.foreColor : '#000000'}
+                      onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
+                      className="h-10 w-12 border border-gray-300 rounded"
+                    />
+                    <input
+                      type="text"
+                      value={section.foreColor}
+                      onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
+                      placeholder="#000000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes Layout</label>
+                <div className="flex gap-4">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`notes-layout-${languageCode}-${index}`}
+                      value="vertical"
+                      checked={section.notesLayout === 'vertical'}
+                      onChange={() => handleSectionLayoutChange(index, 'vertical')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Vertical</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`notes-layout-${languageCode}-${index}`}
+                      value="horizontal"
+                      checked={section.notesLayout === 'horizontal'}
+                      onChange={() => handleSectionLayoutChange(index, 'horizontal')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Horizontal</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-sm font-semibold text-gray-700">Notes</h5>
+                  <button
+                    type="button"
+                    onClick={() => handleAddNote(index)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    Add Note
+                  </button>
+                </div>
+
+                {section.notes.map((note, noteIdx) => (
+                  <div key={`${languageCode}-section-${index}-note-${noteIdx}`} className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-600">Note {noteIdx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveNote(index, noteIdx)}
+                        className="text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
+                        disabled={section.notes.length === 1}
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Picture URL</label>
+                        <input
+                          type="text"
+                          value={note.picture?.url || ''}
+                          onChange={(e) => handlePictureChange(index, noteIdx, e.target.value)}
+                          placeholder="https://example.com/image.png"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Symbol</label>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl w-9 h-9 flex items-center justify-center border border-gray-200 rounded bg-white">
+                              {note.symbol && note.symbol.trim().startsWith('<svg') ? (
+                                <span
+                                  className="inline-block w-6 h-6"
+                                  style={{ color: note.symbolForeColor || '#1f2937' }}
+                                  dangerouslySetInnerHTML={{ __html: note.symbol }}
+                                />
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </span>
+                            <select
+                              value={note.symbol}
+                              onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                              <option value="">Select an icon…</option>
+                              {SVG_ICON_OPTIONS.map(option => (
+                                <option key={option.label} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Custom SVG (optional)</label>
+                            <textarea
+                              value={note.symbol}
+                              onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
+                              placeholder="Paste SVG markup if you need a custom icon"
+                              rows={3}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Symbol Foreground Color</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={note.symbolForeColor && /^#([0-9A-Fa-f]{6})$/.test(note.symbolForeColor) ? note.symbolForeColor : '#1f2937'}
+                                onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
+                                className="h-10 w-12 border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={note.symbolForeColor}
+                                onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
+                                placeholder="#1F2937"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Caption</label>
+                          <input
+                            type="text"
+                            value={note.caption}
+                            onChange={(e) => handleNoteChange(index, noteIdx, 'caption', e.target.value)}
+                            placeholder="Short caption for this note"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Text</label>
+                        <textarea
+                          value={note.text}
+                          onChange={(e) => handleNoteChange(index, noteIdx, 'text', e.target.value)}
+                          placeholder="Enter note text"
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Fore Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={note.foreColor && /^#([0-9A-Fa-f]{6})$/.test(note.foreColor) ? note.foreColor : '#000000'}
+                            onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
+                            className="h-10 w-12 border border-gray-300 rounded"
+                          />
+                          <input
+                            type="text"
+                            value={note.foreColor}
+                            onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
+                            placeholder="#000000"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Back Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={note.backColor && /^#([0-9A-Fa-f]{6})$/.test(note.backColor) ? note.backColor : '#ffffff'}
+                            onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
+                            className="h-10 w-12 border border-gray-300 rounded"
+                          />
+                          <input
+                            type="text"
+                            value={note.backColor}
+                            onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
+                            placeholder="#FFFFFF"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={handleAddSection}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
+        >
+          Add Section
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CompanyForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business'>('basic');
+  const [activeLanguageTab, setActiveLanguageTab] = useState<string>('en');
   
   const [formData, setFormData] = useState<Partial<Company>>({
     companyName: '',
@@ -54,6 +713,7 @@ const CompanyForm: React.FC = () => {
     taxId: '',
     stripeAccountId: '',
     blinkKey: '',
+    texts: undefined,
     isActive: true
   });
 
@@ -104,6 +764,7 @@ const CompanyForm: React.FC = () => {
         taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
         stripeAccountId: formData.stripeAccountId && formData.stripeAccountId.trim() ? formData.stripeAccountId : undefined,
         blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
+        texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
 
       if (id) {
@@ -168,7 +829,77 @@ const CompanyForm: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8 bg-white rounded-lg shadow-lg p-8">
-          {/* Basic Information */}
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                type="button"
+                onClick={() => setActiveTab('basic')}
+                className={`${
+                  activeTab === 'basic'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Basic Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('design')}
+                className={`${
+                  activeTab === 'design'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Design
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('content')}
+                className={`${
+                  activeTab === 'content'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Content
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('texts');
+                  // Ensure activeLanguageTab is set to a valid language
+                  if (!LANGUAGES.find(l => l.code === activeLanguageTab)) {
+                    setActiveLanguageTab('en');
+                  }
+                }}
+                className={`${
+                  activeTab === 'texts'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Sections
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('business')}
+                className={`${
+                  activeTab === 'business'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                Business
+              </button>
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="pt-6">
+          {/* Basic Information Tab */}
+          {activeTab === 'basic' && (
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Basic Information</h2>
             
@@ -273,8 +1004,10 @@ const CompanyForm: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
-          {/* Branding */}
+          {/* Design Tab */}
+          {activeTab === 'design' && (
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Branding & Design</h2>
             
@@ -408,9 +1141,12 @@ const CompanyForm: React.FC = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-          </section>
 
-          {/* Content & Messaging */}
+          </section>
+          )}
+
+          {/* Content Tab */}
+          {activeTab === 'content' && (
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Content & Messaging</h2>
             
@@ -507,8 +1243,47 @@ const CompanyForm: React.FC = () => {
               </p>
             </div>
           </section>
+          )}
 
-          {/* Business Information */}
+          {/* Texts Tab */}
+          {activeTab === 'texts' && (
+          <section className="space-y-4">
+            
+            {/* Language Sub-Tabs */}
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-4" aria-label="Language Tabs">
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => setActiveLanguageTab(lang.code)}
+                    className={`${
+                      activeLanguageTab === lang.code
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-3 px-3 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.name}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Language Content */}
+            <div className="pt-6">
+              <LanguageTextEditor
+                languageCode={activeLanguageTab}
+                value={formData.texts}
+                onChange={(value) => setFormData(prev => ({ ...prev, texts: value }))}
+              />
+            </div>
+          </section>
+          )}
+
+          {/* Business Tab */}
+          {activeTab === 'business' && (
+          <>
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Business Information</h2>
             
@@ -589,11 +1364,14 @@ const CompanyForm: React.FC = () => {
                     onChange={handleChange}
                     className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-gray-700">Active</span>
+                  <span className="text-gray-700">Active              </span>
                 </label>
               )}
             </div>
           </section>
+          </>
+          )}
+          </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-4 pt-4 border-t">

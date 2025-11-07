@@ -25,6 +25,7 @@ interface Company {
   taxId?: string;
   stripeAccountId?: string;
   blinkKey?: string; // BlinkID license key for the company
+  texts?: string; // JSONB field - array of language objects with title and description
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
