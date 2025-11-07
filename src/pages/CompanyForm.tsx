@@ -168,7 +168,7 @@ const parseTexts = (jsonString?: string): LanguageText[] => {
             description: section?.description ?? '',
             backColor: section?.backColor ?? '#ffffff',
             foreColor: section?.foreColor ?? '#000000',
-            notesLayout: section?.notesLayout == 'horizontal' ? 'horizontal' : 'vertical',
+            notesLayout: section?.notesLayout === 'horizontal' ? 'horizontal' : 'vertical',
             notes: Array.isArray(section?.notes) && section.notes.length > 0
               ? section.notes.map((note: any): SectionNote => ({
                   picture: normalizePicture(note?.picture ?? note?.picturePng ?? ''),
@@ -195,7 +195,7 @@ const parseTexts = (jsonString?: string): LanguageText[] => {
               description: item?.description ?? '',
               backColor: item?.backColor ?? '#ffffff',
               foreColor: item?.foreColor ?? '#000000',
-              notesLayout: item?.notesLayout == 'horizontal' ? 'horizontal' : 'vertical',
+            notesLayout: item?.notesLayout === 'horizontal' ? 'horizontal' : 'vertical',
               notes: [
                 {
                   ...createEmptyNote(),
