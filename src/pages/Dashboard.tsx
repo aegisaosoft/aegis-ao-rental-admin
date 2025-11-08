@@ -6,6 +6,20 @@ import Layout from '../components/Layout';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase();
+  const firstName = user?.firstName ? user.firstName.trim() : '';
+  const userId = user?.userId ? user.userId.trim() : '';
+  const displayName = firstName || userId || 'User';
+  const displayRole = roleLower ? roleLower : 'user';
+  const canAccessSettings = roleLower === 'mainadmin' || roleLower === 'admin';
+
+  React.useEffect(() => {
+    console.groupCollapsed('[Dashboard] user snapshot');
+    console.info('[Dashboard]', 'raw user object:', user);
+    console.info('[Dashboard]', 'displayName:', displayName);
+    console.info('[Dashboard]', 'displayRole:', displayRole);
+    console.groupEnd();
+  }, [user, displayName, displayRole]);
   const navigate = useNavigate();
 
   if (!user) {
@@ -22,10 +36,10 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome back, {user.firstName}!
+            Welcome back, {displayName}!
           </h2>
           <p className="text-gray-600">
-            You're logged in as <span className="font-medium capitalize">{user.role}</span>
+            You're logged in as <span className="font-medium capitalize">{displayRole}</span>
           </p>
         </div>
 
@@ -41,11 +55,15 @@ const Dashboard = () => {
               <p className="font-medium text-gray-900">Companies</p>
               <p className="text-sm text-gray-500">Manage rental companies</p>
             </button>
-            <button className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors">
-              <Settings className="h-6 w-6 text-blue-600 mb-2" />
-              <p className="font-medium text-gray-900">Settings</p>
-              <p className="text-sm text-gray-500">Manage app settings</p>
-            </button>
+            {canAccessSettings && (
+              <button 
+                onClick={() => navigate('/settings')}
+                className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors">
+                <Settings className="h-6 w-6 text-blue-600 mb-2" />
+                <p className="font-medium text-gray-900">Settings</p>
+                <p className="text-sm text-gray-500">Manage app settings</p>
+              </button>
+            )}
           </div>
         </div>
       </div>

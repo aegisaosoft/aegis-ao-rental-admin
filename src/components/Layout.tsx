@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Car, LogOut, Building2, Home } from 'lucide-react';
+import { Car, LogOut, Building2, Home, Settings as SettingsIcon } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -25,6 +25,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
     );
   }
+
+  const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase();
+  const firstName = (user.firstName ?? '').trim();
+  const lastName = (user.lastName ?? '').trim();
+  const userId = (user.userId ?? '').trim();
+  const displayName = `${firstName || userId || 'User'}${lastName ? ` ${lastName}` : ''}`.trim();
+  const displayRole = roleLower || 'user';
+  const canAccessSettings = roleLower === 'mainadmin' || roleLower === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -64,12 +72,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Building2 className="h-4 w-4" />
               <span className="text-sm font-medium">Companies</span>
             </button>
+            {canAccessSettings && (
+              <button
+                onClick={() => navigate('/settings')}
+                className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                  pathname.startsWith('/settings')
+                    ? 'bg-blue-700 text-white'
+                    : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                }`}
+              >
+                <SettingsIcon className="h-4 w-4" />
+                <span className="text-sm font-medium">Settings</span>
+              </button>
+            )}
 
             {/* User Info and Logout */}
             <div className="flex items-center gap-3 pl-4 border-l border-blue-500">
               <div className="text-right">
-                <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-                <p className="text-xs text-blue-200 capitalize">{user.role}</p>
+                <p className="text-sm font-medium text-white">{displayName || 'User'}</p>
+                <p className="text-xs text-blue-200 capitalize">{displayRole || 'user'}</p>
               </div>
               <button
                 onClick={handleLogout}

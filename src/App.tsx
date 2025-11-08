@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import CompanyList from './pages/CompanyList';
 import CompanyForm from './pages/CompanyForm';
 import ScrollToTop from './components/ScrollToTop';
+import Settings from './pages/Settings';
 import './App.css';
 
 // Protected route component
@@ -59,6 +60,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CompanyForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

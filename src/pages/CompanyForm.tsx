@@ -85,50 +85,77 @@ const SVG_ICON_OPTIONS: { value: string; label: string }[] = [
 ];
 
 // Interface for language text object
+type LocalizedTextMap = Record<string, string>;
+
 interface SectionNotePicture {
   url: string;
 }
 
+type PictureValue = {
+  url: string;
+};
+
 interface SectionNote {
   picture: SectionNotePicture;
-  caption: string;
   symbolForeColor: string;
   symbol: string;
-  text: string;
   foreColor: string;
   backColor: string;
+  title: LocalizedTextMap;
+  caption: LocalizedTextMap;
+  text: LocalizedTextMap;
 }
 
-interface LanguageSection {
-  title: string;
-  description: string;
+interface Section {
   backColor: string;
   foreColor: string;
   notesLayout: 'vertical' | 'horizontal';
+  alignment: 'left' | 'right' | 'center';
+  backgroundImage: PictureValue;
+  title: LocalizedTextMap;
+  description: LocalizedTextMap;
   notes: SectionNote[];
 }
 
-interface LanguageText {
-  language: string;
-  sections: LanguageSection[];
-}
+const createEmptyLocalizedMap = (): LocalizedTextMap => {
+  const map: LocalizedTextMap = {};
+  LANGUAGES.forEach(lang => {
+    map[lang.code] = '';
+  });
+  return map;
+};
+
+const ensureLocalizedMap = (value: any): LocalizedTextMap => {
+  const map = createEmptyLocalizedMap();
+  if (value && typeof value === 'object') {
+    LANGUAGES.forEach(lang => {
+      if (typeof value[lang.code] === 'string') {
+        map[lang.code] = value[lang.code];
+      }
+    });
+  }
+  return map;
+};
 
 const createEmptyNote = (): SectionNote => ({
   picture: { url: '' },
-  caption: '',
   symbolForeColor: '#1f2937',
   symbol: '',
-  text: '',
   foreColor: '',
-  backColor: ''
+  backColor: '',
+  title: createEmptyLocalizedMap(),
+  caption: createEmptyLocalizedMap(),
+  text: createEmptyLocalizedMap()
 });
 
-const createEmptySection = (): LanguageSection => ({
-  title: '',
-  description: '',
+const createEmptySection = (): Section => ({
   backColor: '#ffffff',
   foreColor: '#000000',
   notesLayout: 'vertical',
+  alignment: 'left',
+  backgroundImage: { url: '' },
+  title: createEmptyLocalizedMap(),
+  description: createEmptyLocalizedMap(),
   notes: [createEmptyNote()]
 });
 
@@ -147,98 +174,128 @@ const normalizePicture = (picture: any): SectionNotePicture => {
   return { url: '' };
 };
 
-// Parse JSON string to array, or initialize with default structure
-const parseTexts = (jsonString?: string): LanguageText[] => {
-  if (!jsonString || jsonString.trim() === '') {
-    // Return default structure with all languages
-    return LANGUAGES.map(lang => ({
-      language: lang.code,
-      sections: [createEmptySection()]
-    })) as LanguageText[];
+const normalizeNote = (note: any): SectionNote => ({
+  picture: normalizePicture(note?.picture ?? note?.picturePng ?? ''),
+  symbolForeColor: note?.symbolForeColor ?? '#1f2937',
+  symbol: note?.symbol ?? '',
+  foreColor: note?.foreColor ?? '',
+  backColor: note?.backColor ?? '',
+  title: ensureLocalizedMap(note?.title),
+  caption: ensureLocalizedMap(note?.caption),
+  text: ensureLocalizedMap(note?.text)
+});
+
+const normalizeSection = (section: any): Section => ({
+  backColor: section?.backColor ?? '#ffffff',
+  foreColor: section?.foreColor ?? '#000000',
+  notesLayout: section?.notesLayout === 'horizontal' ? 'horizontal' : 'vertical',
+  alignment: ['left', 'right', 'center'].includes(section?.alignment)
+    ? section.alignment
+    : 'left',
+  backgroundImage: normalizePicture(section?.backgroundImage ?? section?.backgroundImageUrl ?? ''),
+  title: ensureLocalizedMap(section?.title),
+  description: ensureLocalizedMap(section?.description),
+  notes:
+    Array.isArray(section?.notes) && section.notes.length > 0
+      ? section.notes.map((note: any) => normalizeNote(note))
+      : [createEmptyNote()]
+});
+
+const ensureSectionsNormalized = (sections: Section[]): Section[] => {
+  if (!sections.length) {
+    return [createEmptySection()];
   }
-  
+  return sections.map(section => ({
+    ...section,
+    title: ensureLocalizedMap(section.title),
+    description: ensureLocalizedMap(section.description),
+    alignment: ['left', 'right', 'center'].includes(section.alignment)
+      ? section.alignment
+      : 'left',
+    backgroundImage: normalizePicture(section.backgroundImage),
+    notes:
+      section.notes && section.notes.length
+        ? section.notes.map(note => ({
+            ...note,
+            picture: normalizePicture(note.picture),
+            title: ensureLocalizedMap(note.title),
+            caption: ensureLocalizedMap(note.caption),
+            text: ensureLocalizedMap(note.text)
+          }))
+        : [createEmptyNote()]
+  }));
+};
+
+const convertLegacyTextsToSections = (legacy: any[]): Section[] => {
+  const sections: Section[] = [];
+
+  legacy.forEach((languageEntry: any) => {
+    const langCode = typeof languageEntry?.language === 'string' ? languageEntry.language : 'en';
+    const legacySections = Array.isArray(languageEntry?.sections) ? languageEntry.sections : [];
+
+    legacySections.forEach((legacySection: any, sectionIndex: number) => {
+      if (!sections[sectionIndex]) {
+        sections[sectionIndex] = createEmptySection();
+      }
+      const section = sections[sectionIndex];
+
+      section.backColor = legacySection?.backColor ?? section.backColor;
+      section.foreColor = legacySection?.foreColor ?? section.foreColor;
+      section.notesLayout =
+        legacySection?.notesLayout === 'horizontal' ? 'horizontal' : section.notesLayout;
+      section.title[langCode] = legacySection?.title ?? '';
+      section.description[langCode] = legacySection?.description ?? '';
+
+      const legacyNotes = Array.isArray(legacySection?.notes) ? legacySection.notes : [];
+      legacyNotes.forEach((legacyNote: any, noteIndex: number) => {
+        if (!section.notes[noteIndex]) {
+          section.notes[noteIndex] = createEmptyNote();
+        }
+        const note = section.notes[noteIndex];
+
+        const normalizedPicture = normalizePicture(
+          legacyNote?.picture ?? legacyNote?.picturePng ?? note.picture
+        );
+        if (!note.picture?.url && normalizedPicture.url) {
+          note.picture = normalizedPicture;
+        }
+        note.symbolForeColor = legacyNote?.symbolForeColor ?? note.symbolForeColor;
+        note.symbol = legacyNote?.symbol ?? note.symbol;
+        note.foreColor = legacyNote?.foreColor ?? note.foreColor;
+        note.backColor = legacyNote?.backColor ?? note.backColor;
+        note.title[langCode] = legacyNote?.title ?? '';
+        note.caption[langCode] = legacyNote?.caption ?? '';
+        note.text[langCode] = legacyNote?.text ?? '';
+      });
+    });
+  });
+
+  return ensureSectionsNormalized(sections.length ? sections : [createEmptySection()]);
+};
+
+// Parse JSON string to array, or initialize with default structure
+const parseSections = (jsonString?: string): Section[] => {
+  if (!jsonString || jsonString.trim() === '') {
+    return [createEmptySection()];
+  }
+
   try {
     const parsed = JSON.parse(jsonString);
     if (Array.isArray(parsed)) {
-      const texts: LanguageText[] = parsed.map((item: any) => {
-        // Backwards compatibility: if title/description exist directly, wrap into sections array
-        if (item && Array.isArray(item.sections)) {
-          const sections = item.sections.map((section: any): LanguageSection => ({
-            title: section?.title ?? '',
-            description: section?.description ?? '',
-            backColor: section?.backColor ?? '#ffffff',
-            foreColor: section?.foreColor ?? '#000000',
-            notesLayout: section?.notesLayout === 'horizontal' ? 'horizontal' : 'vertical',
-            notes: Array.isArray(section?.notes) && section.notes.length > 0
-              ? section.notes.map((note: any): SectionNote => ({
-                  picture: normalizePicture(note?.picture ?? note?.picturePng ?? ''),
-                  caption: note?.caption ?? '',
-                  symbolForeColor: note?.symbolForeColor ?? '#1f2937',
-                  symbol: note?.symbol ?? '',
-                  text: note?.text ?? '',
-                  foreColor: note?.foreColor ?? '',
-                  backColor: note?.backColor ?? ''
-                }))
-              : [createEmptyNote()]
-          }));
-          return {
-            language: item.language ?? 'en',
-            sections: sections.length > 0 ? sections : [createEmptySection()]
-          };
-        }
+      const isLegacyFormat = parsed.some(
+        item => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'language')
+      );
+      if (isLegacyFormat) {
+        return convertLegacyTextsToSections(parsed);
+      }
 
-        return {
-          language: item?.language ?? 'en',
-          sections: [
-            {
-              title: item?.title ?? '',
-              description: item?.description ?? '',
-              backColor: item?.backColor ?? '#ffffff',
-              foreColor: item?.foreColor ?? '#000000',
-            notesLayout: item?.notesLayout === 'horizontal' ? 'horizontal' : 'vertical',
-              notes: [
-                {
-                  ...createEmptyNote(),
-                  picture: normalizePicture(item?.picture ?? item?.picturePng ?? ''),
-                  caption: item?.caption ?? '',
-                  symbolForeColor: item?.symbolForeColor ?? '#1f2937',
-                  symbol: item?.symbol ?? '',
-                  text: item?.text ?? '',
-                  foreColor: item?.foreColor ?? '',
-                  backColor: item?.backColor ?? ''
-                }
-              ]
-            }
-          ]
-        };
-      });
-
-      // Ensure all languages are present
-      const existingLanguages = texts.map((item) => item.language);
-      LANGUAGES.forEach(lang => {
-        if (!existingLanguages.includes(lang.code)) {
-          texts.push({
-            language: lang.code,
-            sections: [createEmptySection()]
-          });
-        }
-      });
-
-      return texts;
+      return ensureSectionsNormalized(parsed.map(normalizeSection));
     }
-    // If not an array, return default
-    return LANGUAGES.map(lang => ({
-      language: lang.code,
-      sections: [createEmptySection()]
-    }));
   } catch (e) {
     console.error('Failed to parse texts JSON:', e);
-    // Return default structure on parse error
-    return LANGUAGES.map(lang => ({
-      language: lang.code,
-      sections: [createEmptySection()]
-    }));
   }
+
+  return [createEmptySection()];
 };
 
 // LanguageTextEditor Component - Shows one language at a time
@@ -246,138 +303,212 @@ interface LanguageTextEditorProps {
   languageCode: string;
   value?: string;
   onChange: (value: string) => void;
+  openFilePicker: (accept: string, onFileLoad: (dataUrl: string) => void) => void;
 }
 
-const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, value, onChange }) => {
-  const [texts, setTexts] = useState<LanguageText[]>(() => parseTexts(value));
-  // Update local state when value prop or languageCode changes
+const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, value, onChange, openFilePicker }) => {
+  const [sections, setSections] = useState<Section[]>(() => parseSections(value));
+  const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
+  const [collapsedNotes, setCollapsedNotes] = useState<Record<number, Record<number, boolean>>>({});
+  // Update local state when value prop changes
   useEffect(() => {
-    setTexts(parseTexts(value));
-  }, [value, languageCode]);
+    setCollapsedSections(prev => {
+      const nextState: Record<number, boolean> = {};
+      sections.forEach((_, idx) => {
+        nextState[idx] = Object.prototype.hasOwnProperty.call(prev, idx) ? prev[idx] : true;
+      });
+      return nextState;
+    });
+
+    setCollapsedNotes(prev => {
+      const nextState: Record<number, Record<number, boolean>> = {};
+      sections.forEach((section, sectionIdx) => {
+        const prevSectionState = prev[sectionIdx] || {};
+        const nextSectionState: Record<number, boolean> = {};
+        section.notes.forEach((_, noteIdx) => {
+          nextSectionState[noteIdx] = Object.prototype.hasOwnProperty.call(prevSectionState, noteIdx)
+            ? prevSectionState[noteIdx]
+            : true;
+        });
+        nextState[sectionIdx] = nextSectionState;
+      });
+      return nextState;
+    });
+  }, [sections]);
+
+  useEffect(() => {
+    setSections(parseSections(value));
+  }, [value]);
 
   // Get current language data
   // Language code comes from active tab selection and is not editable
   const currentLang = LANGUAGES.find(l => l.code === languageCode) || LANGUAGES[0];
-  const textData = texts.find(t => t.language === languageCode) || {
-    language: languageCode, // Always use languageCode from props (read-only)
-    sections: [createEmptySection()]
-  };
 
-  const handleSectionsUpdate = (sections: LanguageSection[]) => {
-    const updated = texts.map(item =>
-      item.language === languageCode
-        ? { ...item, language: languageCode, sections }
-        : item
-    );
-
-    // Ensure the current language exists (using languageCode from props)
-    const currentLangExists = updated.some(item => item.language === languageCode);
-    if (!currentLangExists) {
-      updated.push({
-        language: languageCode, // Use languageCode from props, not from data
-        sections: sections.length > 0 ? sections : [createEmptySection()]
-      });
-    }
-    
-    // Ensure all languages are present (using language codes from LANGUAGES constant)
-    const existingLanguages = updated.map(item => item.language);
-    LANGUAGES.forEach(lang => {
-      if (!existingLanguages.includes(lang.code)) {
-        updated.push({
-          language: lang.code, // Use language code from constant, not editable
-          sections: [createEmptySection()]
-        });
-      }
-    });
-    
-    setTexts(updated);
-    
-    // Convert back to JSON string and notify parent
+  const handleSectionsUpdate = (updatedSections: Section[]) => {
+    const normalized = ensureSectionsNormalized(updatedSections);
+    setSections(normalized);
     try {
-      const jsonString = JSON.stringify(updated, null, 2);
+      const jsonString = JSON.stringify(normalized, null, 2);
       onChange(jsonString);
     } catch (e) {
-      console.error('Failed to stringify texts:', e);
+      console.error('Failed to stringify sections:', e);
     }
   };
 
   const handleSectionChange = (index: number, field: 'title' | 'description', value: string) => {
-    const sections = [...textData.sections];
-    sections[index] = {
-      ...sections[index],
-      [field]: value
-    };
-    handleSectionsUpdate(sections);
+    const updatedSections = sections.map((section, idx) =>
+      idx === index
+        ? {
+            ...section,
+            [field]: {
+              ...section[field],
+              [languageCode]: value
+            }
+          }
+        : section
+    );
+    handleSectionsUpdate(updatedSections);
   };
 
   const handleSectionColorChange = (index: number, field: 'backColor' | 'foreColor', value: string) => {
-    const sections = [...textData.sections];
-    sections[index] = {
-      ...sections[index],
-      [field]: value
-    };
-    handleSectionsUpdate(sections);
+    const updatedSections = sections.map((section, idx) =>
+      idx === index
+        ? {
+            ...section,
+            [field]: value
+          }
+        : section
+    );
+    handleSectionsUpdate(updatedSections);
   };
 
   const handleSectionLayoutChange = (index: number, value: 'vertical' | 'horizontal') => {
-    const sections = [...textData.sections];
-    sections[index] = {
-      ...sections[index],
-      notesLayout: value
-    };
-    handleSectionsUpdate(sections);
+    const updatedSections = sections.map((section, idx) =>
+      idx === index
+        ? {
+            ...section,
+            notesLayout: value
+          }
+        : section
+    );
+    handleSectionsUpdate(updatedSections);
+  };
+
+  const handleSectionAlignmentChange = (index: number, value: 'left' | 'right' | 'center') => {
+    const updatedSections = sections.map((section, idx) =>
+      idx === index
+        ? {
+            ...section,
+            alignment: value
+          }
+        : section
+    );
+    handleSectionsUpdate(updatedSections);
+  };
+
+  const handleSectionBackgroundChange = (index: number, value: string) => {
+    const updatedSections = sections.map((section, idx) =>
+      idx === index
+        ? {
+            ...section,
+            backgroundImage: { url: value }
+          }
+        : section
+    );
+    handleSectionsUpdate(updatedSections);
+  };
+
+  const handleSectionBackgroundUpload = (index: number) => {
+    openFilePicker('image/*', (dataUrl) => {
+      handleSectionBackgroundChange(index, dataUrl);
+    });
+  };
+
+  const handleSectionBackgroundClear = (index: number) => {
+    handleSectionBackgroundChange(index, '');
   };
 
   const handleAddSection = () => {
-    const sections = [...textData.sections, createEmptySection()];
-    handleSectionsUpdate(sections);
+    handleSectionsUpdate([...sections, createEmptySection()]);
   };
 
   const handleRemoveSection = (index: number) => {
-    const sections = textData.sections.filter((_, i) => i !== index);
-    handleSectionsUpdate(sections.length > 0 ? sections : [createEmptySection()]);
+    const updatedSections = sections.filter((_, i) => i !== index);
+    handleSectionsUpdate(updatedSections.length > 0 ? updatedSections : [createEmptySection()]);
+  };
+
+  const toggleSectionCollapse = (index: number) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev };
+      const isCollapsed = Object.prototype.hasOwnProperty.call(next, index) ? next[index] : true;
+      next[index] = !isCollapsed;
+      return next;
+    });
+  };
+
+  const toggleNoteCollapse = (sectionIndex: number, noteIndex: number) => {
+    setCollapsedNotes(prev => {
+      const next = { ...prev };
+      const sectionState = next[sectionIndex] ? { ...next[sectionIndex] } : {};
+      const isCollapsed = Object.prototype.hasOwnProperty.call(sectionState, noteIndex) ? sectionState[noteIndex] : true;
+      sectionState[noteIndex] = !isCollapsed;
+      next[sectionIndex] = sectionState;
+      return next;
+    });
   };
 
   const handleNoteChange = (
     sectionIndex: number,
     noteIndex: number,
-    field: 'symbol' | 'symbolForeColor' | 'text' | 'foreColor' | 'backColor' | 'caption',
+    field: 'symbol' | 'symbolForeColor' | 'text' | 'foreColor' | 'backColor' | 'caption' | 'title',
     value: string
   ) => {
-    const sections = textData.sections.map((section, idx) => {
+    const updatedSections = sections.map((section, idx) => {
       if (idx !== sectionIndex) return section;
-      const notes = section.notes.map((note, nIdx) =>
-        nIdx === noteIndex ? { ...note, [field]: value } : note
-      );
+      const notes = section.notes.map((note, nIdx) => {
+        if (nIdx !== noteIndex) return note;
+
+        if (field === 'title' || field === 'caption' || field === 'text') {
+          return {
+            ...note,
+            [field]: {
+              ...note[field],
+              [languageCode]: value
+            }
+          };
+        }
+
+        return { ...note, [field]: value };
+      });
       return { ...section, notes };
     });
-    handleSectionsUpdate(sections);
+    handleSectionsUpdate(updatedSections);
   };
 
   const handlePictureChange = (sectionIndex: number, noteIndex: number, value: string) => {
-    const sections = textData.sections.map((section, idx) => {
+    const updatedSections = sections.map((section, idx) => {
       if (idx !== sectionIndex) return section;
       const notes = section.notes.map((note, nIdx) =>
         nIdx === noteIndex ? { ...note, picture: { url: value } } : note
       );
       return { ...section, notes };
     });
-    handleSectionsUpdate(sections);
+    handleSectionsUpdate(updatedSections);
   };
 
   const handleAddNote = (sectionIndex: number) => {
-    const sections = textData.sections.map((section, idx) => {
+    const updatedSections = sections.map((section, idx) => {
       if (idx !== sectionIndex) return section;
       return {
         ...section,
         notes: [...section.notes, createEmptyNote()]
       };
     });
-    handleSectionsUpdate(sections);
+    handleSectionsUpdate(updatedSections);
   };
 
   const handleRemoveNote = (sectionIndex: number, noteIndex: number) => {
-    const sections = textData.sections.map((section, idx) => {
+    const updatedSections = sections.map((section, idx) => {
       if (idx !== sectionIndex) return section;
       const notes = section.notes.filter((_, nIdx) => nIdx !== noteIndex);
       return {
@@ -385,289 +516,487 @@ const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, v
         notes: notes.length > 0 ? notes : [createEmptyNote()]
       };
     });
-    handleSectionsUpdate(sections);
+    handleSectionsUpdate(updatedSections);
   };
+
+  const handleNotePictureUpload = (sectionIndex: number, noteIndex: number) => {
+    openFilePicker('image/*', (dataUrl) => {
+      handlePictureChange(sectionIndex, noteIndex, dataUrl);
+      setCollapsedNotes(prev => {
+        const next = { ...prev };
+        const sectionState = next[sectionIndex] ? { ...next[sectionIndex] } : {};
+        sectionState[noteIndex] = false;
+        next[sectionIndex] = sectionState;
+        return next;
+      });
+    });
+  };
+
+  const handleNotePictureClear = (sectionIndex: number, noteIndex: number) => {
+    handlePictureChange(sectionIndex, noteIndex, '');
+  };
+
+  const languageCollapsed = collapsedSections || {};
+  const notesCollapsed = collapsedNotes || {};
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xl font-semibold text-gray-800">
-        <span className="text-2xl">{currentLang.flag}</span>
-        <span>{currentLang.name}</span>
-      </div>
-
       <div className="space-y-6">
-        {textData.sections.map((section, index) => (
-          <div key={`${languageCode}-section-${index}`} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-md font-semibold text-gray-700">Section {index + 1}</h4>
-              <button
-                type="button"
-                onClick={() => handleRemoveSection(index)}
-                className="text-sm text-red-600 hover:text-red-700 disabled:text-gray-400"
-                disabled={textData.sections.length === 1}
-              >
-                Delete
-              </button>
-            </div>
+        {sections.map((section, index) => {
+          const sectionNotesState = notesCollapsed[index] || {};
+          const isSectionCollapsed = Object.prototype.hasOwnProperty.call(languageCollapsed, index) ? languageCollapsed[index] : true;
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={section.title}
-                  onChange={(e) => handleSectionChange(index, 'title', e.target.value)}
-                  placeholder={`Enter section title in ${currentLang.name}`}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={section.description}
-                  onChange={(e) => handleSectionChange(index, 'description', e.target.value)}
-                  placeholder={`Enter section description in ${currentLang.name}`}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Section Background Color</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={section.backColor && /^#([0-9A-Fa-f]{6})$/.test(section.backColor) ? section.backColor : '#ffffff'}
-                      onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
-                      className="h-10 w-12 border border-gray-300 rounded"
-                    />
-                    <input
-                      type="text"
-                      value={section.backColor}
-                      onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
-                      placeholder="#FFFFFF"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Section Foreground Color</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={section.foreColor && /^#([0-9A-Fa-f]{6})$/.test(section.foreColor) ? section.foreColor : '#000000'}
-                      onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
-                      className="h-10 w-12 border border-gray-300 rounded"
-                    />
-                    <input
-                      type="text"
-                      value={section.foreColor}
-                      onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
-                      placeholder="#000000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes Layout</label>
-                <div className="flex gap-4">
-                  <label className="inline-flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name={`notes-layout-${languageCode}-${index}`}
-                      value="vertical"
-                      checked={section.notesLayout === 'vertical'}
-                      onChange={() => handleSectionLayoutChange(index, 'vertical')}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Vertical</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name={`notes-layout-${languageCode}-${index}`}
-                      value="horizontal"
-                      checked={section.notesLayout === 'horizontal'}
-                      onChange={() => handleSectionLayoutChange(index, 'horizontal')}
-                      className="text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-700">Horizontal</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-sm font-semibold text-gray-700">Notes</h5>
+          return (
+            <div key={`${languageCode}-section-${index}`} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                <div className="flex items-start gap-3">
                   <button
                     type="button"
-                    onClick={() => handleAddNote(index)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    onClick={() => toggleSectionCollapse(index)}
+                    className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-full text-gray-600 hover:text-blue-600 hover:border-blue-400"
+                    aria-label={isSectionCollapsed ? 'Expand section' : 'Collapse section'}
                   >
-                    Add Note
+                    <span className="text-lg leading-none">{isSectionCollapsed ? '▶' : '▼'}</span>
                   </button>
+                  <div>
+                    <h4 className="text-md font-semibold text-gray-700">Section {index + 1}</h4>
+                  {(section.title[languageCode] || section.description[languageCode]) && (
+                      <p className="text-sm text-gray-500 max-w-md truncate">
+                      {section.title[languageCode] || section.description[languageCode] || ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSection(index)}
+                  className="text-sm text-red-600 hover:text-red-700 disabled:text-gray-400"
+                  disabled={sections.length === 1}
+                >
+                  Delete
+                </button>
+              </div>
+
+            {!isSectionCollapsed && (
+              <div className="space-y-6 mt-4">
+                <div className="space-y-4 rounded-md border border-gray-200 bg-white p-4">
+                  <h5 className="text-sm font-semibold text-gray-700">Shared Settings</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Section Background Color
+                      </label>
+                      <p className="text-xs text-gray-500 mb-2">Shared across all languages</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={section.backColor && /^#([0-9A-Fa-f]{6})$/.test(section.backColor) ? section.backColor : '#ffffff'}
+                          onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
+                          className="h-10 w-12 border border-gray-300 rounded"
+                        />
+                        <input
+                          type="text"
+                          value={section.backColor}
+                          onChange={(e) => handleSectionColorChange(index, 'backColor', e.target.value)}
+                          placeholder="#FFFFFF"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Section Foreground Color
+                      </label>
+                      <p className="text-xs text-gray-500 mb-2">Shared across all languages</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={section.foreColor && /^#([0-9A-Fa-f]{6})$/.test(section.foreColor) ? section.foreColor : '#000000'}
+                          onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
+                          className="h-10 w-12 border border-gray-300 rounded"
+                        />
+                        <input
+                          type="text"
+                          value={section.foreColor}
+                          onChange={(e) => handleSectionColorChange(index, 'foreColor', e.target.value)}
+                          placeholder="#000000"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes Layout</label>
+                    <p className="text-xs text-gray-500 mb-2">Shared across all languages</p>
+                    <div className="flex gap-4">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`notes-layout-shared-${index}`}
+                          value="vertical"
+                          checked={section.notesLayout === 'vertical'}
+                          onChange={() => handleSectionLayoutChange(index, 'vertical')}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Vertical</span>
+                      </label>
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`notes-layout-shared-${index}`}
+                          value="horizontal"
+                          checked={section.notesLayout === 'horizontal'}
+                          onChange={() => handleSectionLayoutChange(index, 'horizontal')}
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Horizontal</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Section Alignment</label>
+                    <p className="text-xs text-gray-500 mb-2">Shared across all languages</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['left', 'center', 'right'] as const).map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => handleSectionAlignmentChange(index, option)}
+                          className={`px-3 py-1 text-sm rounded border transition ${
+                            section.alignment === option
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          {option.charAt(0).toUpperCase() + option.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Section Background Image
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">Shared across all languages</p>
+                    <div className="space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <input
+                          type="text"
+                          value={section.backgroundImage?.url || ''}
+                          onChange={(e) => handleSectionBackgroundChange(index, e.target.value)}
+                          placeholder="https://example.com/background.jpg"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSectionBackgroundUpload(index)}
+                            className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                          >
+                            Upload
+                          </button>
+                          {section.backgroundImage?.url && (
+                            <button
+                              type="button"
+                              onClick={() => handleSectionBackgroundClear(index)}
+                              className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {section.backgroundImage?.url && (
+                        <img
+                          src={section.backgroundImage.url}
+                          alt={`Section ${index + 1} background preview`}
+                          className="h-24 w-full max-w-xl object-cover rounded border border-gray-200"
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {section.notes.map((note, noteIdx) => (
-                  <div key={`${languageCode}-section-${index}-note-${noteIdx}`} className="border border-gray-200 rounded-md p-3 bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-gray-600">Note {noteIdx + 1}</span>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Title ({currentLang.name})
+                    </label>
+                    <input
+                      type="text"
+                      value={section.title[languageCode] ?? ''}
+                      onChange={(e) => handleSectionChange(index, 'title', e.target.value)}
+                      placeholder={`Enter section title in ${currentLang.name}`}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description ({currentLang.name})
+                    </label>
+                    <textarea
+                      value={section.description[languageCode] ?? ''}
+                      onChange={(e) => handleSectionChange(index, 'description', e.target.value)}
+                      placeholder={`Enter section description in ${currentLang.name}`}
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-sm font-semibold text-gray-700">Notes</h5>
                       <button
                         type="button"
-                        onClick={() => handleRemoveNote(index, noteIdx)}
-                        className="text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
-                        disabled={section.notes.length === 1}
+                        onClick={() => handleAddNote(index)}
+                        className="text-sm text-blue-600 hover:text-blue-700"
                       >
-                        Delete
+                        Add Note
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Picture URL</label>
-                        <input
-                          type="text"
-                          value={note.picture?.url || ''}
-                          onChange={(e) => handlePictureChange(index, noteIdx, e.target.value)}
-                          placeholder="https://example.com/image.png"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        />
-                      </div>
+                    {section.notes.map((note, noteIdx) => {
+                      const isNoteCollapsed =
+                        notesCollapsed[index]?.[noteIdx] ?? true;
+                      const currentTitle = section.notes[noteIdx].title[languageCode] || '';
 
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Symbol</label>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl w-9 h-9 flex items-center justify-center border border-gray-200 rounded bg-white">
-                              {note.symbol && note.symbol.trim().startsWith('<svg') ? (
-                                <span
-                                  className="inline-block w-6 h-6"
-                                  style={{ color: note.symbolForeColor || '#1f2937' }}
-                                  dangerouslySetInnerHTML={{ __html: note.symbol }}
-                                />
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
-                            </span>
-                            <select
-                              value={note.symbol}
-                              onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                            >
-                              <option value="">Select an icon…</option>
-                              {SVG_ICON_OPTIONS.map(option => (
-                                <option key={option.label} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Custom SVG (optional)</label>
-                            <textarea
-                              value={note.symbol}
-                              onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
-                              placeholder="Paste SVG markup if you need a custom icon"
-                              rows={3}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-xs"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Symbol Foreground Color</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={note.symbolForeColor && /^#([0-9A-Fa-f]{6})$/.test(note.symbolForeColor) ? note.symbolForeColor : '#1f2937'}
-                                onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
-                                className="h-10 w-12 border border-gray-300 rounded"
-                              />
-                              <input
-                                type="text"
-                                value={note.symbolForeColor}
-                                onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
-                                placeholder="#1F2937"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                              />
+                      return (
+                        <div key={`${languageCode}-section-${index}-note-${noteIdx}`} className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                          <div className="space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleNoteCollapse(index, noteIdx)}
+                                  className="flex items-center justify-center w-7 h-7 border border-gray-300 rounded-full text-gray-600 hover:text-blue-600 hover:border-blue-400"
+                                  aria-label={isNoteCollapsed ? 'Expand note' : 'Collapse note'}
+                                >
+                                  <span className="text-base leading-none">{isNoteCollapsed ? '▶' : '▼'}</span>
+                                </button>
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-gray-600 uppercase">Note {noteIdx + 1}</span>
+                                  <span className="text-xs text-gray-500 truncate max-w-xs">
+                                    {currentTitle || 'No title set'}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveNote(index, noteIdx)}
+                                className="self-start md:self-center text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
+                                disabled={section.notes.length === 1}
+                              >
+                                Delete
+                              </button>
                             </div>
+
+                            {!isNoteCollapsed && (
+                              <div className="space-y-4">
+                                <div className="space-y-3 rounded border border-gray-200 bg-white p-3">
+                                  <h6 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Shared Settings
+                                  </h6>
+
+                                  <div className="space-y-2">
+                                    <label className="block text-xs font-medium text-gray-600">Picture URL</label>
+                                    <p className="text-[11px] text-gray-500">Shared across all languages</p>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={note.picture?.url || ''}
+                                        onChange={(e) => handlePictureChange(index, noteIdx, e.target.value)}
+                                        placeholder="https://example.com/image.png"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                      />
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleNotePictureUpload(index, noteIdx)}
+                                          className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                                        >
+                                          Upload
+                                        </button>
+                                        {note.picture?.url && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleNotePictureClear(index, noteIdx)}
+                                            className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                                          >
+                                            Clear
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {note.picture?.url && (
+                                      <img
+                                        src={note.picture.url}
+                                        alt={`Note ${noteIdx + 1} preview`}
+                                        className="h-20 w-auto rounded border border-gray-200 object-cover"
+                                      />
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Symbol</label>
+                                    <p className="text-[11px] text-gray-500 mb-2">Shared across all languages</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xl w-9 h-9 flex items-center justify-center border border-gray-200 rounded bg-white">
+                                          {note.symbol && note.symbol.trim().startsWith('<svg') ? (
+                                            <span
+                                              className="inline-block w-6 h-6"
+                                              style={{ color: note.symbolForeColor || '#1f2937' }}
+                                              dangerouslySetInnerHTML={{ __html: note.symbol }}
+                                            />
+                                          ) : (
+                                            <span className="text-gray-400">—</span>
+                                          )}
+                                        </span>
+                                        <select
+                                          value={note.symbol}
+                                          onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
+                                          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                        >
+                                          <option value="">Select an icon…</option>
+                                          {SVG_ICON_OPTIONS.map(option => (
+                                            <option key={option.label} value={option.value}>
+                                              {option.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="flex items-center gap-2 md:justify-end">
+                                        <span className="text-xs text-gray-600">Color</span>
+                                        <input
+                                          type="color"
+                                          value={note.symbolForeColor && /^#([0-9A-Fa-f]{6})$/.test(note.symbolForeColor) ? note.symbolForeColor : '#1f2937'}
+                                          onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
+                                          className="h-8 w-10 border border-gray-300 rounded"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={note.symbolForeColor}
+                                          onChange={(e) => handleNoteChange(index, noteIdx, 'symbolForeColor', e.target.value)}
+                                          placeholder="#1F2937"
+                                          className="w-28 px-2 py-1 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-xs"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Custom SVG (optional)</label>
+                                    <p className="text-[11px] text-gray-500 mb-2">Shared across all languages</p>
+                                    <textarea
+                                      value={note.symbol}
+                                      onChange={(e) => handleNoteChange(index, noteIdx, 'symbol', e.target.value)}
+                                      placeholder="Paste SVG markup if you need a custom icon"
+                                      rows={3}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-xs"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Fore Color</label>
+                                    <p className="text-[11px] text-gray-500 mb-2">Shared across all languages</p>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        value={note.foreColor && /^#([0-9A-Fa-f]{6})$/.test(note.foreColor) ? note.foreColor : '#000000'}
+                                        onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
+                                        className="h-10 w-12 border border-gray-300 rounded"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={note.foreColor}
+                                        onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
+                                        placeholder="#000000"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Back Color</label>
+                                    <p className="text-[11px] text-gray-500 mb-2">Shared across all languages</p>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="color"
+                                        value={note.backColor && /^#([0-9A-Fa-f]{6})$/.test(note.backColor) ? note.backColor : '#ffffff'}
+                                        onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
+                                        className="h-10 w-12 border border-gray-300 rounded"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={note.backColor}
+                                        onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
+                                        placeholder="#FFFFFF"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3 rounded border border-gray-200 bg-white p-3">
+                                  <h6 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    {currentLang.name} Content
+                                  </h6>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      Note Title ({currentLang.name})
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={note.title[languageCode] ?? ''}
+                                      onChange={(e) => handleNoteChange(index, noteIdx, 'title', e.target.value)}
+                                      placeholder={`Note ${noteIdx + 1} title`}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      Caption ({currentLang.name})
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={note.caption[languageCode] ?? ''}
+                                      onChange={(e) => handleNoteChange(index, noteIdx, 'caption', e.target.value)}
+                                      placeholder="Short caption for this note"
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                      Text ({currentLang.name})
+                                    </label>
+                                    <textarea
+                                      value={note.text[languageCode] ?? ''}
+                                      onChange={(e) => handleNoteChange(index, noteIdx, 'text', e.target.value)}
+                                      placeholder="Enter note text"
+                                      rows={3}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Caption</label>
-                          <input
-                            type="text"
-                            value={note.caption}
-                            onChange={(e) => handleNoteChange(index, noteIdx, 'caption', e.target.value)}
-                            placeholder="Short caption for this note"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
                         </div>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Text</label>
-                        <textarea
-                          value={note.text}
-                          onChange={(e) => handleNoteChange(index, noteIdx, 'text', e.target.value)}
-                          placeholder="Enter note text"
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Fore Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={note.foreColor && /^#([0-9A-Fa-f]{6})$/.test(note.foreColor) ? note.foreColor : '#000000'}
-                            onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
-                            className="h-10 w-12 border border-gray-300 rounded"
-                          />
-                          <input
-                            type="text"
-                            value={note.foreColor}
-                            onChange={(e) => handleNoteChange(index, noteIdx, 'foreColor', e.target.value)}
-                            placeholder="#000000"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Back Color</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={note.backColor && /^#([0-9A-Fa-f]{6})$/.test(note.backColor) ? note.backColor : '#ffffff'}
-                            onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
-                            className="h-10 w-12 border border-gray-300 rounded"
-                          />
-                          <input
-                            type="text"
-                            value={note.backColor}
-                            onChange={(e) => handleNoteChange(index, noteIdx, 'backColor', e.target.value)}
-                            placeholder="#FFFFFF"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
-                ))}
+                </div>
               </div>
+            )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <button
           type="button"
@@ -700,15 +1029,12 @@ const CompanyForm: React.FC = () => {
     faviconUrl: '',
     country: '',
     language: 'en',
-    motto: '',
-    mottoDescription: '',
     about: '',
     website: '',
     customCss: '',
     videoLink: '',
     bannerLink: '',
     backgroundLink: '',
-    invitation: '',
     bookingIntegrated: false,
     taxId: '',
     stripeAccountId: '',
@@ -717,12 +1043,97 @@ const CompanyForm: React.FC = () => {
     isActive: true
   });
 
+  const normalizedSubdomain =
+    formData.subdomain && formData.subdomain.trim()
+      ? formData.subdomain.trim().toLowerCase()
+      : '';
+  const websiteDisplay = normalizedSubdomain
+    ? `https://${normalizedSubdomain}.aegis-rental.com`
+    : '';
+
+  type MediaFieldKey = 'logoUrl' | 'faviconUrl' | 'bannerLink' | 'backgroundLink' | 'videoLink';
+
+  const triggerFilePicker = useCallback((accept: string, onFileLoad: (dataUrl: string) => void) => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.style.display = 'none';
+
+    const cleanup = () => {
+      input.value = '';
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
+    };
+
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        cleanup();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          onFileLoad(reader.result);
+        }
+        cleanup();
+      };
+      reader.onerror = () => {
+        console.error('Failed to read selected file');
+        cleanup();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+  }, []);
+
+  const handleMediaUpload = useCallback((field: MediaFieldKey, accept: string) => {
+    triggerFilePicker(accept, (dataUrl) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: dataUrl
+      }));
+    });
+  }, [triggerFilePicker]);
+
+  const handleMediaClear = useCallback((field: MediaFieldKey) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: ''
+    }));
+  }, []);
+
   const loadCompany = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await companyService.getCompanyById(id!);
-      setFormData(data);
+      console.groupCollapsed('[CompanyForm] loadCompany result');
+      console.log('id:', data?.id);
+      console.log('companyName:', data?.companyName);
+      console.log('raw texts value:', (data as any)?.texts);
+      console.groupEnd();
+      const normalizedTexts =
+        typeof (data as any).texts === 'string'
+          ? (data as any).texts
+          : (data as any).texts
+          ? JSON.stringify((data as any).texts)
+          : '';
+      console.log('[CompanyForm] normalized texts string length:', normalizedTexts.length);
+
+      setFormData(prev => ({
+        ...prev,
+        ...data,
+        texts: normalizedTexts
+      }));
     } catch (err: any) {
       console.error('Failed to load company:', err);
       setError(err.message || 'Failed to load company');
@@ -744,23 +1155,22 @@ const CompanyForm: React.FC = () => {
 
     try {
       // Prepare data - convert empty strings to null for optional fields
+      const { motto, mottoDescription, invitation, ...baseFormData } = formData;
+
       const submitData = {
-        ...formData,
+        ...baseFormData,
         // Convert empty strings to null/undefined for optional fields
-        subdomain: formData.subdomain && formData.subdomain.trim() ? formData.subdomain.trim().toLowerCase() : undefined,
+        subdomain: normalizedSubdomain || undefined,
         logoUrl: formData.logoUrl && formData.logoUrl.trim() ? formData.logoUrl : undefined,
         faviconUrl: formData.faviconUrl && formData.faviconUrl.trim() ? formData.faviconUrl : undefined,
         country: formData.country && formData.country.trim() ? formData.country : undefined,
         language: formData.language && formData.language.trim() ? formData.language : undefined,
-        motto: formData.motto && formData.motto.trim() ? formData.motto : undefined,
-        mottoDescription: formData.mottoDescription && formData.mottoDescription.trim() ? formData.mottoDescription : undefined,
         about: formData.about && formData.about.trim() ? formData.about : undefined,
-        website: formData.website && formData.website.trim() ? formData.website : undefined,
+        website: websiteDisplay ? websiteDisplay : undefined,
         customCss: formData.customCss && formData.customCss.trim() ? formData.customCss : undefined,
         videoLink: formData.videoLink && formData.videoLink.trim() ? formData.videoLink : undefined,
         bannerLink: formData.bannerLink && formData.bannerLink.trim() ? formData.bannerLink : undefined,
         backgroundLink: formData.backgroundLink && formData.backgroundLink.trim() ? formData.backgroundLink : undefined,
-        invitation: formData.invitation && formData.invitation.trim() ? formData.invitation : undefined,
         taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
         stripeAccountId: formData.stripeAccountId && formData.stripeAccountId.trim() ? formData.stripeAccountId : undefined,
         blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
@@ -808,9 +1218,12 @@ const CompanyForm: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <Building2 className="h-8 w-8 text-blue-600 mr-3" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              {id ? 'Edit Company' : 'Create New Company'}
-            </h1>
+            <div>
+              <label className="text-sm uppercase tracking-wide text-gray-500">Company Name</label>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {formData.companyName ? formData.companyName : (id ? 'Unnamed Company' : 'New Company')}
+              </h1>
+            </div>
           </div>
           <button 
             type="button" 
@@ -828,7 +1241,7 @@ const CompanyForm: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8 bg-white rounded-lg shadow-lg p-8">
+        <form onSubmit={handleSubmit} className="space-y-8 bg-white rounded-lg shadow-lg p-8 pb-32">
           {/* Tab Navigation */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -906,7 +1319,7 @@ const CompanyForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Name <span className="text-red-600">*</span>
+                  {id ? 'Company Name (changing)' : 'Company Name'} <span className="text-red-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -947,7 +1360,7 @@ const CompanyForm: React.FC = () => {
                   name="subdomain"
                   value={formData.subdomain || ''}
                   onChange={handleChange}
-                  pattern="[a-z0-9-]+"
+                  pattern="[a-z0-9\-]+"
                   placeholder="company"
                   className="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -1065,81 +1478,204 @@ const CompanyForm: React.FC = () => {
               <label htmlFor="logoUrl" className="block text-sm font-medium text-gray-700 mb-2">
                 Logo URL
               </label>
-              <input
-                type="url"
-                id="logoUrl"
-                name="logoUrl"
-                value={formData.logoUrl || ''}
-                onChange={handleChange}
-                placeholder="https://example.com/logo.png"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-              {formData.logoUrl && (
-                <img src={formData.logoUrl} alt="Logo preview" className="mt-2 max-w-xs h-20 object-contain border border-gray-300 rounded" />
-              )}
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <input
+                    type="url"
+                    id="logoUrl"
+                    name="logoUrl"
+                    value={formData.logoUrl || ''}
+                    onChange={handleChange}
+                    placeholder="https://example.com/logo.png"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMediaUpload('logoUrl', 'image/*')}
+                      className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                    >
+                      Upload
+                    </button>
+                    {formData.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleMediaClear('logoUrl')}
+                        className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {formData.logoUrl && (
+                  <img src={formData.logoUrl} alt="Logo preview" className="max-w-xs h-20 object-contain border border-gray-300 rounded" />
+                )}
+              </div>
             </div>
 
             <div>
               <label htmlFor="faviconUrl" className="block text-sm font-medium text-gray-700 mb-2">
                 Favicon URL
               </label>
-              <input
-                type="url"
-                id="faviconUrl"
-                name="faviconUrl"
-                value={formData.faviconUrl || ''}
-                onChange={handleChange}
-                placeholder="https://example.com/favicon.ico"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <input
+                  type="url"
+                  id="faviconUrl"
+                  name="faviconUrl"
+                  value={formData.faviconUrl || ''}
+                  onChange={handleChange}
+                  placeholder="https://example.com/favicon.ico"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMediaUpload('faviconUrl', 'image/*')}
+                    className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                  >
+                    Upload
+                  </button>
+                  {formData.faviconUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleMediaClear('faviconUrl')}
+                      className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              {formData.faviconUrl && (
+                <img src={formData.faviconUrl} alt="Favicon preview" className="mt-2 h-12 w-12 object-contain border border-gray-300 rounded" />
+              )}
             </div>
 
             <div>
               <label htmlFor="bannerLink" className="block text-sm font-medium text-gray-700 mb-2">
                 Banner Image URL
               </label>
-              <input
-                type="url"
-                id="bannerLink"
-                name="bannerLink"
-                value={formData.bannerLink || ''}
-                onChange={handleChange}
-                placeholder="https://example.com/banner.jpg"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-              {formData.bannerLink && (
-                <img src={formData.bannerLink} alt="Banner preview" className="mt-2 w-full max-w-2xl h-48 object-cover border border-gray-300 rounded" />
-              )}
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <input
+                    type="url"
+                    id="bannerLink"
+                    name="bannerLink"
+                    value={formData.bannerLink || ''}
+                    onChange={handleChange}
+                    placeholder="https://example.com/banner.jpg"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMediaUpload('bannerLink', 'image/*')}
+                      className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                    >
+                      Upload
+                    </button>
+                    {formData.bannerLink && (
+                      <button
+                        type="button"
+                        onClick={() => handleMediaClear('bannerLink')}
+                        className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {formData.bannerLink && (
+                  <img src={formData.bannerLink} alt="Banner preview" className="w-full max-w-2xl h-48 object-cover border border-gray-300 rounded" />
+                )}
+              </div>
             </div>
 
             <div>
               <label htmlFor="backgroundLink" className="block text-sm font-medium text-gray-700 mb-2">
                 Background Image URL
               </label>
-              <input
-                type="url"
-                id="backgroundLink"
-                name="backgroundLink"
-                value={formData.backgroundLink || ''}
-                onChange={handleChange}
-                placeholder="https://example.com/background.jpg"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <input
+                  type="url"
+                  id="backgroundLink"
+                  name="backgroundLink"
+                  value={formData.backgroundLink || ''}
+                  onChange={handleChange}
+                  placeholder="https://example.com/background.jpg"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMediaUpload('backgroundLink', 'image/*')}
+                    className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                  >
+                    Upload
+                  </button>
+                  {formData.backgroundLink && (
+                    <button
+                      type="button"
+                      onClick={() => handleMediaClear('backgroundLink')}
+                      className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              {formData.backgroundLink && (
+                <img src={formData.backgroundLink} alt="Background preview" className="mt-2 w-full max-w-2xl h-40 object-cover border border-gray-300 rounded" />
+              )}
             </div>
 
             <div>
               <label htmlFor="videoLink" className="block text-sm font-medium text-gray-700 mb-2">
                 Video Link
               </label>
-              <input
-                type="url"
-                id="videoLink"
-                name="videoLink"
-                value={formData.videoLink || ''}
-                onChange={handleChange}
-                placeholder="https://youtube.com/watch?v=..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <input
+                    type="url"
+                    id="videoLink"
+                    name="videoLink"
+                    value={formData.videoLink || ''}
+                    onChange={handleChange}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMediaUpload('videoLink', 'video/*')}
+                      className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
+                    >
+                      Upload
+                    </button>
+                    {formData.videoLink && (
+                      <button
+                        type="button"
+                        onClick={() => handleMediaClear('videoLink')}
+                        className="px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-md hover:bg-gray-100"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {formData.videoLink && (
+                  <div className="rounded border border-gray-300 p-2">
+                    <video
+                      controls
+                      className="w-full max-w-2xl rounded"
+                      src={formData.videoLink}
+                    >
+                      Your browser does not support embedded videos.
+                    </video>
+                  </div>
+                )}
+              </div>
             </div>
 
           </section>
@@ -1150,51 +1686,6 @@ const CompanyForm: React.FC = () => {
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Content & Messaging</h2>
             
-            <div>
-              <label htmlFor="motto" className="block text-sm font-medium text-gray-700 mb-2">
-                Motto
-              </label>
-              <input
-                type="text"
-                id="motto"
-                name="motto"
-                value={formData.motto || ''}
-                onChange={handleChange}
-                placeholder="e.g., Your Trusted Rental Partner"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="mottoDescription" className="block text-sm font-medium text-gray-700 mb-2">
-                Motto Description
-              </label>
-              <textarea
-                id="mottoDescription"
-                name="mottoDescription"
-                value={formData.mottoDescription || ''}
-                onChange={handleChange}
-                rows={2}
-                placeholder="e.g., Providing quality rental services since 2024"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="invitation" className="block text-sm font-medium text-gray-700 mb-2">
-                Invitation Text
-              </label>
-              <input
-                type="text"
-                id="invitation"
-                name="invitation"
-                value={formData.invitation || ''}
-                onChange={handleChange}
-                placeholder="e.g., Find & Book a Great Deal Today"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
             <div>
               <label htmlFor="about" className="block text-sm font-medium text-gray-700 mb-2">
                 About
@@ -1211,18 +1702,28 @@ const CompanyForm: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-2">
-                Website URL
+              <label htmlFor="website" className="block text-sm font-medium text-gray-700 mb-2 flex flex-col">
+                <span>Website URL</span>
+                <span className="text-xs text-gray-500">Read-only for now; generated from the subdomain.</span>
               </label>
               <input
                 type="url"
                 id="website"
                 name="website"
-                value={formData.website || ''}
-                onChange={handleChange}
-                placeholder="https://company.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                value={websiteDisplay}
+                readOnly
+                className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 focus:outline-none cursor-not-allowed"
               />
+              {normalizedSubdomain && (
+                <a
+                  href={websiteDisplay}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  {websiteDisplay}
+                </a>
+              )}
             </div>
 
             <div>
@@ -1247,38 +1748,37 @@ const CompanyForm: React.FC = () => {
 
           {/* Texts Tab */}
           {activeTab === 'texts' && (
-          <section className="space-y-4">
-            
-            {/* Language Sub-Tabs */}
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-4" aria-label="Language Tabs">
+          <>
+            <section className="space-y-4 pb-24">
+              <div className="pt-6">
+                <LanguageTextEditor
+                  languageCode={activeLanguageTab}
+                  value={formData.texts}
+                  onChange={(value) => setFormData(prev => ({ ...prev, texts: value }))}
+                  openFilePicker={triggerFilePicker}
+                />
+              </div>
+            </section>
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30">
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap gap-2 justify-center">
                 {LANGUAGES.map(lang => (
                   <button
                     key={lang.code}
                     type="button"
                     onClick={() => setActiveLanguageTab(lang.code)}
-                    className={`${
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
                       activeLanguageTab === lang.code
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    } whitespace-nowrap py-3 px-3 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
                   >
                     <span>{lang.flag}</span>
                     <span>{lang.name}</span>
                   </button>
                 ))}
-              </nav>
+              </div>
             </div>
-
-            {/* Language Content */}
-            <div className="pt-6">
-              <LanguageTextEditor
-                languageCode={activeLanguageTab}
-                value={formData.texts}
-                onChange={(value) => setFormData(prev => ({ ...prev, texts: value }))}
-              />
-            </div>
-          </section>
+          </>
           )}
 
           {/* Business Tab */}
