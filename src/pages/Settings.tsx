@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
 import { UserPlus, Shield, Users, Pencil, Trash2, Power } from 'lucide-react';
 import userService, { AegisUser, SaveUserRequest } from '../services/userService';
@@ -37,7 +37,7 @@ const Settings: React.FC = () => {
     [users, includeInactive]
   );
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     if (!canViewSettings) return;
     try {
       setLoading(true);
@@ -50,13 +50,13 @@ const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canViewSettings]);
 
   useEffect(() => {
     if (canViewSettings) {
       loadUsers();
     }
-  }, [canViewSettings, isMainAdmin]);
+  }, [canViewSettings, loadUsers]);
 
   const resetForm = () => {
     setFormData({

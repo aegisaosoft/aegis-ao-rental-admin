@@ -543,7 +543,6 @@ const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, v
     <div className="space-y-6">
       <div className="space-y-6">
         {sections.map((section, index) => {
-          const sectionNotesState = notesCollapsed[index] || {};
           const isSectionCollapsed = Object.prototype.hasOwnProperty.call(languageCollapsed, index) ? languageCollapsed[index] : true;
 
           return (
