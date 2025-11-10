@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
-import { Building2, ArrowLeft, Save, X } from 'lucide-react';
+import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown } from 'lucide-react';
 import Layout from '../components/Layout';
 
 // Country options grouped by continent
@@ -32,6 +32,147 @@ const LANGUAGES = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'de', name: 'Deutsch', flag: '🇩🇪' }
 ];
+
+const AI_INTEGRATION_OPTIONS = ['free', 'claude', 'premium'] as const;
+type AiIntegrationOption = typeof AI_INTEGRATION_OPTIONS[number];
+
+const normalizeAiIntegration = (value?: string | null): AiIntegrationOption => {
+  if (!value) {
+    return 'claude';
+  }
+  const normalized = value.toLowerCase() as AiIntegrationOption;
+  return (AI_INTEGRATION_OPTIONS as readonly string[]).includes(normalized) ? normalized : 'claude';
+};
+
+const AI_PLAN_CONFIG: Record<
+  AiIntegrationOption,
+  {
+    title: string;
+    subtitle: string;
+    price: string;
+    badge?: string;
+    Icon: React.ComponentType<{ className?: string }>;
+    borderClass: string;
+    gradientClass?: string;
+    badgeClass?: string;
+  }
+> = {
+  free: {
+    title: 'Free',
+    subtitle: 'Smart rule-based recommendations',
+    price: '$0',
+    Icon: Zap,
+    borderClass: 'border-emerald-300',
+    gradientClass: '',
+  },
+  claude: {
+    title: 'Claude AI',
+    subtitle: 'Advanced AI recommendations',
+    price: '$0.007/request',
+    badge: 'Best Value',
+    Icon: Sparkles,
+    borderClass: 'border-indigo-300',
+    gradientClass: 'bg-gradient-to-r from-indigo-500 via-indigo-400 to-violet-500 text-white',
+    badgeClass: 'bg-indigo-100 text-indigo-700',
+  },
+  premium: {
+    title: 'Premium',
+    subtitle: 'GPT-4 + HD Voice',
+    price: '$0.045/request',
+    Icon: Crown,
+    borderClass: 'border-amber-300',
+    gradientClass: '',
+  },
+};
+
+const COUNTRY_CURRENCY_MAP: Record<string, string> = {
+  'anguilla': 'XCD',
+  'antigua and barbuda': 'XCD',
+  'bahamas': 'BSD',
+  'barbados': 'BBD',
+  'belize': 'BZD',
+  'bermuda': 'BMD',
+  'british virgin islands': 'USD',
+  'canada': 'CAD',
+  'cayman islands': 'KYD',
+  'costa rica': 'CRC',
+  'cuba': 'CUP',
+  'dominica': 'XCD',
+  'dominican republic': 'DOP',
+  'el salvador': 'USD',
+  'greenland': 'DKK',
+  'grenada': 'XCD',
+  'guatemala': 'GTQ',
+  'haiti': 'HTG',
+  'honduras': 'HNL',
+  'jamaica': 'JMD',
+  'mexico': 'MXN',
+  'montserrat': 'XCD',
+  'nicaragua': 'NIO',
+  'panama': 'PAB',
+  'puerto rico': 'USD',
+  'saint kitts and nevis': 'XCD',
+  'saint lucia': 'XCD',
+  'saint pierre and miquelon': 'EUR',
+  'saint vincent and the grenadines': 'XCD',
+  'trinidad and tobago': 'TTD',
+  'turks and caicos islands': 'USD',
+  'united states': 'USD',
+  'us virgin islands': 'USD',
+  'argentina': 'ARS',
+  'bolivia': 'BOB',
+  'brazil': 'BRL',
+  'chile': 'CLP',
+  'colombia': 'COP',
+  'ecuador': 'USD',
+  'french guiana': 'EUR',
+  'guyana': 'GYD',
+  'paraguay': 'PYG',
+  'peru': 'PEN',
+  'suriname': 'SRD',
+  'uruguay': 'UYU',
+  'venezuela': 'VES'
+};
+
+const CURRENCY_OPTIONS = [
+  { code: 'ARS', label: 'Argentine Peso (ARS)' },
+  { code: 'BBD', label: 'Barbadian Dollar (BBD)' },
+  { code: 'BMD', label: 'Bermudian Dollar (BMD)' },
+  { code: 'BOB', label: 'Bolivian Boliviano (BOB)' },
+  { code: 'BRL', label: 'Brazilian Real (BRL)' },
+  { code: 'BSD', label: 'Bahamian Dollar (BSD)' },
+  { code: 'BZD', label: 'Belize Dollar (BZD)' },
+  { code: 'CAD', label: 'Canadian Dollar (CAD)' },
+  { code: 'CLP', label: 'Chilean Peso (CLP)' },
+  { code: 'COP', label: 'Colombian Peso (COP)' },
+  { code: 'CRC', label: 'Costa Rican Colón (CRC)' },
+  { code: 'CUP', label: 'Cuban Peso (CUP)' },
+  { code: 'DKK', label: 'Danish Krone (DKK)' },
+  { code: 'DOP', label: 'Dominican Peso (DOP)' },
+  { code: 'EUR', label: 'Euro (EUR)' },
+  { code: 'GTQ', label: 'Guatemalan Quetzal (GTQ)' },
+  { code: 'GYD', label: 'Guyanese Dollar (GYD)' },
+  { code: 'HNL', label: 'Honduran Lempira (HNL)' },
+  { code: 'HTG', label: 'Haitian Gourde (HTG)' },
+  { code: 'JMD', label: 'Jamaican Dollar (JMD)' },
+  { code: 'KYD', label: 'Cayman Islands Dollar (KYD)' },
+  { code: 'MXN', label: 'Mexican Peso (MXN)' },
+  { code: 'NIO', label: 'Nicaraguan Córdoba (NIO)' },
+  { code: 'PAB', label: 'Panamanian Balboa (PAB)' },
+  { code: 'PEN', label: 'Peruvian Sol (PEN)' },
+  { code: 'PYG', label: 'Paraguayan Guaraní (PYG)' },
+  { code: 'SRD', label: 'Surinamese Dollar (SRD)' },
+  { code: 'TTD', label: 'Trinidad & Tobago Dollar (TTD)' },
+  { code: 'USD', label: 'US Dollar (USD)' },
+  { code: 'UYU', label: 'Uruguayan Peso (UYU)' },
+  { code: 'VES', label: 'Venezuelan Bolívar (VES)' },
+  { code: 'XCD', label: 'Eastern Caribbean Dollar (XCD)' }
+].sort((a, b) => a.label.localeCompare(b.label));
+
+const getCurrencyForCountry = (country?: string | null): string => {
+  const normalized = country?.trim().toLowerCase() ?? '';
+  return COUNTRY_CURRENCY_MAP[normalized] || 'USD';
+};
 
 const SVG_ICON_OPTIONS: { value: string; label: string }[] = [
   {
@@ -1015,7 +1156,7 @@ const CompanyForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business' | 'ai'>('basic');
   const [activeLanguageTab, setActiveLanguageTab] = useState<string>('en');
   
   const [formData, setFormData] = useState<Partial<Company>>({
@@ -1027,6 +1168,7 @@ const CompanyForm: React.FC = () => {
     logoUrl: '',
     faviconUrl: '',
     country: '',
+    currency: 'USD',
     language: 'en',
     about: '',
     website: '',
@@ -1038,9 +1180,13 @@ const CompanyForm: React.FC = () => {
     taxId: '',
     stripeAccountId: '',
     blinkKey: '',
+    aiIntegration: 'claude',
     texts: undefined,
     isActive: true
   });
+  const [forceUsd, setForceUsd] = useState(false);
+  const [hasStoredStripeAccount, setHasStoredStripeAccount] = useState(false);
+  const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
 
   const normalizedSubdomain =
     formData.subdomain && formData.subdomain.trim()
@@ -1110,6 +1256,13 @@ const CompanyForm: React.FC = () => {
     }));
   }, []);
 
+  const handleAiPlanSelect = useCallback((value: AiIntegrationOption) => {
+    setFormData(prev => ({
+      ...prev,
+      aiIntegration: value
+    }));
+  }, []);
+
   const loadCompany = useCallback(async () => {
     try {
       setLoading(true);
@@ -1127,12 +1280,28 @@ const CompanyForm: React.FC = () => {
           ? JSON.stringify((data as any).texts)
           : '';
       console.log('[CompanyForm] normalized texts string length:', normalizedTexts.length);
+      const resolvedCurrency = (data?.currency || getCurrencyForCountry(data?.country)).toUpperCase();
 
+      const sanitizedStripeAccount = '';
+      const hasStripe = Boolean((data as any)?.hasStripeAccount || (data as any)?.stripeAccountId);
+      setHasStoredStripeAccount(hasStripe);
+      setRemoveStripeAccount(false);
+
+      const { hasStripeAccount, ...rest } = (data as any) ?? {};
+      const incomingAiIntegration = normalizeAiIntegration(
+        (rest?.aiIntegration as string | undefined) ??
+          (rest?.AiIntegration as string | undefined)
+      );
+ 
       setFormData(prev => ({
         ...prev,
-        ...data,
-        texts: normalizedTexts
+        ...rest,
+        currency: resolvedCurrency,
+        texts: normalizedTexts,
+        stripeAccountId: sanitizedStripeAccount,
+        aiIntegration: incomingAiIntegration
       }));
+      setForceUsd(false);
     } catch (err: any) {
       console.error('Failed to load company:', err);
       setError(err.message || 'Failed to load company');
@@ -1163,6 +1332,7 @@ const CompanyForm: React.FC = () => {
         logoUrl: formData.logoUrl && formData.logoUrl.trim() ? formData.logoUrl : undefined,
         faviconUrl: formData.faviconUrl && formData.faviconUrl.trim() ? formData.faviconUrl : undefined,
         country: formData.country && formData.country.trim() ? formData.country : undefined,
+        currency: formData.currency && formData.currency.trim() ? formData.currency.trim().toUpperCase() : undefined,
         language: formData.language && formData.language.trim() ? formData.language : undefined,
         about: formData.about && formData.about.trim() ? formData.about : undefined,
         website: websiteDisplay ? websiteDisplay : undefined,
@@ -1171,7 +1341,12 @@ const CompanyForm: React.FC = () => {
         bannerLink: formData.bannerLink && formData.bannerLink.trim() ? formData.bannerLink : undefined,
         backgroundLink: formData.backgroundLink && formData.backgroundLink.trim() ? formData.backgroundLink : undefined,
         taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
-        stripeAccountId: formData.stripeAccountId && formData.stripeAccountId.trim() ? formData.stripeAccountId : undefined,
+        stripeAccountId: removeStripeAccount
+          ? ''
+          : formData.stripeAccountId && formData.stripeAccountId.trim()
+            ? formData.stripeAccountId.trim()
+            : undefined,
+        aiIntegration: normalizeAiIntegration(formData.aiIntegration),
         blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
         texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
@@ -1193,14 +1368,73 @@ const CompanyForm: React.FC = () => {
     }
   };
 
+  const handleForceUsdToggle = useCallback((checked: boolean) => {
+    setForceUsd(checked);
+    setFormData(prev => ({
+      ...prev,
+      currency: (checked ? 'USD' : getCurrencyForCountry(prev.country)).toUpperCase()
+    }));
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
+
+    if (name === 'currency') {
+      const nextCurrency = value.toUpperCase();
+      setFormData(prev => ({
+        ...prev,
+        currency: nextCurrency
+      }));
+      if (nextCurrency !== 'USD' && forceUsd) {
+        setForceUsd(false);
+      }
+      return;
+    }
+
+    if (name === 'stripeAccountId') {
+      setRemoveStripeAccount(false);
+      setFormData(prev => ({
+        ...prev,
+        stripeAccountId: value
+      }));
+      return;
+    }
+
+    if (name === 'country') {
+      const nextCountry = value;
+      setFormData(prev => {
+        if (forceUsd) {
+          return {
+            ...prev,
+            country: nextCountry,
+            currency: 'USD'
+          };
+        }
+        const prevSuggested = getCurrencyForCountry(prev.country).toUpperCase();
+        const previousCurrency = (prev.currency || '').toUpperCase();
+        const shouldUpdateCurrency =
+          !previousCurrency || previousCurrency === prevSuggested;
+        const nextCurrencyBase = shouldUpdateCurrency
+          ? getCurrencyForCountry(nextCountry)
+          : (prev.currency || getCurrencyForCountry(nextCountry));
+
+        return {
+          ...prev,
+          country: nextCountry,
+          currency: nextCurrencyBase.toUpperCase()
+        };
+      });
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
   };
+
+  const selectedAiIntegration = normalizeAiIntegration(formData.aiIntegration);
 
   if (loading) {
     return (
@@ -1305,6 +1539,17 @@ const CompanyForm: React.FC = () => {
               >
                 Business
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('ai')}
+                className={`${
+                  activeTab === 'ai'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              >
+                AI Integration
+              </button>
             </nav>
           </div>
 
@@ -1372,28 +1617,69 @@ const CompanyForm: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                  Country
-                </label>
-                <select
-                  id="country"
-                  name="country"
-                  value={formData.country || ''}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Country</option>
-                  {Object.entries(countriesByContinent).map(([continent, countries]) => (
-                    <optgroup key={continent} label={continent}>
-                      {countries.map((country) => (
-                        <option key={country} value={country}>
-                          {country}
+              <div className="md:col-span-2">
+                <div className="flex flex-col gap-6 sm:flex-row">
+                  <div className="flex-1">
+                    <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+                      Country
+                    </label>
+                    <select
+                      id="country"
+                      name="country"
+                      value={formData.country || ''}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Country</option>
+                      {Object.entries(countriesByContinent).map(([continent, countries]) => (
+                        <optgroup key={continent} label={continent}>
+                          {countries.map((country) => (
+                            <option key={country} value={country}>
+                              {country}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex-1">
+                    <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      id="currency"
+                      name="currency"
+                      value={(formData.currency || getCurrencyForCountry(formData.country)).toUpperCase()}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {CURRENCY_OPTIONS.map(option => (
+                        <option key={option.code} value={option.code}>
+                          {option.label}
                         </option>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Automatically selects the common currency for the chosen country. Adjust if the company settles in a different currency.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="inline-flex items-center gap-3 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={forceUsd}
+                    onChange={(event) => handleForceUsdToggle(event.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span>Always use USD regardless of selected country</span>
+                </label>
+                <p className="mt-1 text-sm text-gray-500">
+                  When enabled, the company&rsquo;s prices stay in USD even if the country changes.
+                </p>
               </div>
 
               <div>
@@ -1780,6 +2066,86 @@ const CompanyForm: React.FC = () => {
           </>
           )}
 
+          {/* AI Tab */}
+          {activeTab === 'ai' && (
+          <section className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">AI Integration</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                Choose which AI experience this company should present to customers. You can adjust this at any time.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {AI_INTEGRATION_OPTIONS.map(option => {
+                const config = AI_PLAN_CONFIG[option];
+                const Icon = config.Icon;
+                const isSelected = selectedAiIntegration === option;
+                const backgroundClass =
+                  isSelected && config.gradientClass ? config.gradientClass : 'bg-white';
+                const cardClasses = [
+                  'relative flex h-full flex-col gap-4 rounded-2xl border p-6 text-left transition-all duration-200',
+                  isSelected
+                    ? 'shadow-xl ring-2 ring-offset-2 ring-blue-500 border-transparent'
+                    : `hover:border-blue-200 hover:shadow-md ${config.borderClass}`,
+                  backgroundClass,
+                ].join(' ');
+
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => handleAiPlanSelect(option)}
+                    className={cardClasses}
+                  >
+                    {config.badge && (
+                      <span
+                        className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+                          config.badgeClass || 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {config.badge}
+                      </span>
+                    )}
+
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                        isSelected ? 'bg-blue-600 text-white shadow-lg' : 'bg-blue-50 text-blue-600'
+                      }`}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+
+                    <div className={`${isSelected && config.gradientClass ? 'text-white' : 'text-gray-900'}`}>
+                      <h3 className="text-lg font-semibold">{config.title}</h3>
+                      <p className="mt-1 text-sm opacity-80">{config.subtitle}</p>
+                    </div>
+
+                    <div className={`${isSelected && config.gradientClass ? 'text-white' : 'text-gray-800'} font-semibold`}>
+                      {config.price}
+                    </div>
+
+                    <div className={`mt-auto text-sm ${isSelected && config.gradientClass ? 'text-white text-opacity-80' : 'text-gray-500'}`}>
+                      {option === 'free' && 'Runs entirely with rule-based logic. Ideal for simple deployments with no external AI costs.'}
+                      {option === 'claude' && 'Calls Anthropic Claude for conversational answers. Requires an Anthropic API key in Settings → AI Integration.'}
+                      {option === 'premium' && 'Uses GPT-4 with rich voice output. Requires OpenAI credentials and optional TTS setup in Settings.'}
+                    </div>
+
+                    {isSelected && (
+                      <span className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-blue-400" aria-hidden="true"></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+              <strong className="font-semibold">Reminder:</strong> AI modes draw on the global keys stored under <span className="font-medium">Settings → AI Integration</span>.
+              Ensure the provider you select has valid credentials configured there.
+            </div>
+          </section>
+          )}
+
           {/* Business Tab */}
           {activeTab === 'business' && (
           <>
@@ -1814,7 +2180,35 @@ const CompanyForm: React.FC = () => {
                   onChange={handleChange}
                   placeholder="acct_1234567890"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
                 />
+                {hasStoredStripeAccount ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-gray-500">
+                      A Stripe account is already stored securely. Leave this field blank to keep it, enter a new ID to
+                      replace it, or check the box below to remove it.
+                    </p>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={removeStripeAccount}
+                        onChange={(e) => {
+                          setRemoveStripeAccount(e.target.checked);
+                          if (e.target.checked) {
+                            setFormData(prev => ({ ...prev, stripeAccountId: '' }));
+                          }
+                        }}
+                      />
+                      Remove stored Stripe account ID on save
+                    </label>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-500">
+                    Paste the Stripe connected account ID (e.g., acct_123…) to link payouts. The value will be hidden after
+                    saving.
+                  </p>
+                )}
               </div>
 
             </div>

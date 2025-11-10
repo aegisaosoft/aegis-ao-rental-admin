@@ -127,6 +127,13 @@ const CompanyList: React.FC = () => {
         ),
       },
       {
+        accessorKey: 'currency',
+        header: 'Currency',
+        cell: (info) => (
+          <span className="text-sm font-mono text-gray-700">{info.getValue() as string}</span>
+        ),
+      },
+      {
         accessorKey: 'isActive',
         header: 'Status',
         cell: (info) => {

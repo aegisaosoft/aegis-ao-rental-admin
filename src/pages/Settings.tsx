@@ -1,8 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
-import { UserPlus, Shield, Users, Pencil, Trash2, Power } from 'lucide-react';
+import { UserPlus, Shield, Users, Pencil, Trash2, Power, CreditCard, RefreshCcw, Loader2 } from 'lucide-react';
 import userService, { AegisUser, SaveUserRequest } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
+import settingsService, { StripeSettingsResponse, UpdateStripeSettingsPayload, AiSettingsResponse, UpdateAiSettingsPayload } from '../services/settingsService';
+
+type StripeFormState = {
+  secretKey: string;
+  publishableKey: string;
+  webhookSecret: string;
+  removeSecretKey: boolean;
+  removePublishableKey: boolean;
+  removeWebhookSecret: boolean;
+};
+
+type AiFormState = {
+  anthropicApiKey: string;
+  claudeApiKey: string;
+  openAiApiKey: string;
+  removeAnthropicApiKey: boolean;
+  removeClaudeApiKey: boolean;
+  removeOpenAiApiKey: boolean;
+};
 
 const Settings: React.FC = () => {
   const [users, setUsers] = useState<AegisUser[]>([]);
@@ -21,6 +40,36 @@ const Settings: React.FC = () => {
     isActive: true,
     password: ''
   });
+
+  const [activeTab, setActiveTab] = useState<'users' | 'business' | 'ai'>('users');
+
+  const [stripeSettings, setStripeSettings] = useState<StripeSettingsResponse | null>(null);
+  const [stripeForm, setStripeForm] = useState<StripeFormState>({
+    secretKey: '',
+    publishableKey: '',
+    webhookSecret: '',
+    removeSecretKey: false,
+    removePublishableKey: false,
+    removeWebhookSecret: false,
+  });
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeSaving, setStripeSaving] = useState(false);
+  const [stripeError, setStripeError] = useState<string | null>(null);
+  const [stripeSuccess, setStripeSuccess] = useState<string | null>(null);
+
+  const [aiSettings, setAiSettings] = useState<AiSettingsResponse | null>(null);
+  const [aiForm, setAiForm] = useState<AiFormState>({
+    anthropicApiKey: '',
+    claudeApiKey: '',
+    openAiApiKey: '',
+    removeAnthropicApiKey: false,
+    removeClaudeApiKey: false,
+    removeOpenAiApiKey: false,
+  });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSuccess, setAiSuccess] = useState<string | null>(null);
 
   const { user, loading: authLoading } = useAuth();
   const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().toLowerCase();
@@ -52,11 +101,66 @@ const Settings: React.FC = () => {
     }
   }, [canViewSettings]);
 
-  useEffect(() => {
-    if (canViewSettings) {
-      loadUsers();
+  const loadStripeSettings = useCallback(async () => {
+    if (!canViewSettings) return;
+    try {
+      setStripeLoading(true);
+      setStripeError(null);
+      const result = await settingsService.getStripeSettings();
+      setStripeSettings(result);
+      setStripeForm({
+        secretKey: '',
+        publishableKey: result.publishableKey || '',
+        webhookSecret: '',
+        removeSecretKey: false,
+        removePublishableKey: false,
+        removeWebhookSecret: false,
+      });
+      setStripeSuccess(null);
+    } catch (err: any) {
+      console.error('Failed to load Stripe settings', err);
+      setStripeError(err.response?.data?.error || err.message || 'Failed to load Stripe settings');
+    } finally {
+      setStripeLoading(false);
     }
-  }, [canViewSettings, loadUsers]);
+  }, [canViewSettings]);
+
+  const loadAiSettings = useCallback(async () => {
+    if (!canViewSettings) return;
+    try
+    {
+      setAiLoading(true);
+      setAiError(null);
+      const result = await settingsService.getAiSettings();
+      setAiSettings(result);
+      setAiForm({
+        anthropicApiKey: '',
+        claudeApiKey: '',
+        openAiApiKey: '',
+        removeAnthropicApiKey: false,
+        removeClaudeApiKey: false,
+        removeOpenAiApiKey: false,
+      });
+      setAiSuccess(null);
+    }
+    catch (err: any)
+    {
+      console.error('Failed to load AI settings', err);
+      setAiError(err.response?.data?.error || err.message || 'Failed to load AI settings');
+    }
+    finally
+    {
+      setAiLoading(false);
+    }
+  }, [canViewSettings]);
+
+  useEffect(() => {
+     if (canViewSettings) {
+       loadUsers();
+       loadStripeSettings();
+       loadAiSettings();
+     }
+  }, [canViewSettings, loadUsers, loadStripeSettings, loadAiSettings]);
 
   const resetForm = () => {
     setFormData({
@@ -105,6 +209,71 @@ const Settings: React.FC = () => {
     setFormOpen(false);
     resetForm();
   };
+
+  const handleStripeInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setStripeForm(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleStripeCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = event.target;
+    setStripeForm(prev => ({
+      ...prev,
+      [name]: checked,
+      ...(name === 'removeSecretKey' && checked ? { secretKey: '' } : {}),
+      ...(name === 'removePublishableKey' && checked ? { publishableKey: '' } : {}),
+      ...(name === 'removeWebhookSecret' && checked ? { webhookSecret: '' } : {}),
+    }));
+  };
+
+  const handleStripeReset = () => {
+    setStripeError(null);
+    setStripeSuccess(null);
+    setStripeForm({
+      secretKey: '',
+      publishableKey: stripeSettings?.publishableKey ?? '',
+      webhookSecret: '',
+      removeSecretKey: false,
+      removePublishableKey: false,
+      removeWebhookSecret: false,
+    });
+  };
+
+  const handleAiInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setAiForm(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleAiCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = event.target;
+    setAiForm(prev => ({
+      ...prev,
+      [name]: checked,
+      ...(name === 'removeAnthropicApiKey' && checked ? { anthropicApiKey: '' } : {}),
+      ...(name === 'removeClaudeApiKey' && checked ? { claudeApiKey: '' } : {}),
+      ...(name === 'removeOpenAiApiKey' && checked ? { openAiApiKey: '' } : {}),
+    }));
+  };
+
+  const handleAiReset = () => {
+    setAiError(null);
+    setAiSuccess(null);
+    setAiForm({
+      anthropicApiKey: '',
+      claudeApiKey: '',
+      openAiApiKey: '',
+      removeAnthropicApiKey: false,
+      removeClaudeApiKey: false,
+      removeOpenAiApiKey: false,
+    });
+  };
+
   const handleFormChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = event.target;
     const checked = (event.target as HTMLInputElement).checked;
@@ -207,6 +376,61 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleStripeSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setStripeSaving(true);
+    setStripeError(null);
+    setStripeSuccess(null);
+
+    try
+    {
+      const payload: UpdateStripeSettingsPayload = {};
+
+      if (stripeForm.removeSecretKey)
+      {
+        payload.removeSecretKey = true;
+      }
+      else if (stripeForm.secretKey.trim())
+      {
+        payload.secretKey = stripeForm.secretKey.trim();
+      }
+
+      if (stripeForm.removePublishableKey)
+      {
+        payload.removePublishableKey = true;
+      }
+      else
+      {
+        const trimmedPublishable = stripeForm.publishableKey.trim();
+        if (trimmedPublishable.length > 0) {
+          payload.publishableKey = trimmedPublishable;
+        }
+      }
+
+      if (stripeForm.removeWebhookSecret)
+      {
+        payload.removeWebhookSecret = true;
+      }
+      else if (stripeForm.webhookSecret.trim())
+      {
+        payload.webhookSecret = stripeForm.webhookSecret.trim();
+      }
+
+      await settingsService.updateStripeSettings(payload);
+      setStripeSuccess('Stripe settings updated successfully.');
+      await loadStripeSettings();
+    }
+    catch (err: any)
+    {
+      console.error('Failed to update Stripe settings', err);
+      setStripeError(err.response?.data?.error || err.message || 'Failed to update Stripe settings');
+    }
+    finally
+    {
+      setStripeSaving(false);
+    }
+  };
+
   const handleDelete = async (targetUser: AegisUser) => {
     if (!isMainAdmin) {
       setError('Only main administrators can delete users.');
@@ -235,6 +459,70 @@ const Settings: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to update user', err);
       setError(err.response?.data?.error || err.message || 'Failed to update user');
+    }
+  };
+
+  const handleAiSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAiSaving(true);
+    setAiError(null);
+    setAiSuccess(null);
+
+    try
+    {
+      const payload: UpdateAiSettingsPayload = {};
+
+      if (aiForm.removeAnthropicApiKey)
+      {
+        payload.removeAnthropicApiKey = true;
+      }
+      else
+      {
+        const trimmed = aiForm.anthropicApiKey.trim();
+        if (trimmed.length > 0)
+        {
+          payload.anthropicApiKey = trimmed;
+        }
+      }
+
+      if (aiForm.removeClaudeApiKey)
+      {
+        payload.removeClaudeApiKey = true;
+      }
+      else
+      {
+        const trimmed = aiForm.claudeApiKey.trim();
+        if (trimmed.length > 0)
+        {
+          payload.claudeApiKey = trimmed;
+        }
+      }
+
+      if (aiForm.removeOpenAiApiKey)
+      {
+        payload.removeOpenAiApiKey = true;
+      }
+      else
+      {
+        const trimmed = aiForm.openAiApiKey.trim();
+        if (trimmed.length > 0)
+        {
+          payload.openAiApiKey = trimmed;
+        }
+      }
+
+      await settingsService.updateAiSettings(payload);
+      setAiSuccess('AI settings updated successfully.');
+      await loadAiSettings();
+    }
+    catch (err: any)
+    {
+      console.error('Failed to update AI settings', err);
+      setAiError(err.response?.data?.error || err.message || 'Failed to update AI settings');
+    }
+    finally
+    {
+      setAiSaving(false);
     }
   };
 
@@ -275,6 +563,45 @@ const Settings: React.FC = () => {
           </div>
         )}
 
+        <div className="border-b border-gray-200">
+          <nav className="flex gap-4" aria-label="Settings tabs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('users')}
+              className={`px-3 py-2 border-b-2 text-sm font-medium transition-colors ${
+                activeTab === 'users'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Users
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('business')}
+              className={`px-3 py-2 border-b-2 text-sm font-medium transition-colors ${
+                activeTab === 'business'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Business
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className={`px-3 py-2 border-b-2 text-sm font-medium transition-colors ${
+                activeTab === 'ai'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              AI Integration
+            </button>
+          </nav>
+        </div>
+
+        {activeTab === 'users' && (
         <section className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
@@ -410,6 +737,316 @@ const Settings: React.FC = () => {
             </div>
           </div>
         </section>
+        )}
+
+        {activeTab === 'business' && (
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                Business Settings
+              </h2>
+              <p className="text-sm text-gray-500">
+                Manage the Stripe credentials used for payments across the platform.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadStripeSettings}
+              disabled={stripeLoading || stripeSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 disabled:opacity-60"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
+
+          <form onSubmit={handleStripeSubmit} className="px-6 py-6 space-y-6">
+            {stripeError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {stripeError}
+              </div>
+            )}
+
+            {stripeSuccess && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                {stripeSuccess}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Stripe Secret Key</label>
+                <input
+                  type="password"
+                  name="secretKey"
+                  value={stripeForm.secretKey}
+                  onChange={handleStripeInputChange}
+                  placeholder="sk_live_..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {stripeSettings?.hasSecretKey
+                    ? `Stored key: ${stripeSettings.secretKeyPreview ?? '••••'}. Leave blank to keep.`
+                    : 'No secret key stored yet. Paste your Stripe secret key to enable payouts.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removeSecretKey"
+                    checked={stripeForm.removeSecretKey}
+                    onChange={handleStripeCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove stored secret key on save
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Stripe Publishable Key</label>
+                <input
+                  type="text"
+                  name="publishableKey"
+                  value={stripeForm.publishableKey}
+                  onChange={handleStripeInputChange}
+                  placeholder="pk_live_..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {stripeSettings?.publishableKey
+                    ? 'Update the key or leave unchanged to keep the current value.'
+                    : 'Paste the publishable key used by your Stripe account.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removePublishableKey"
+                    checked={stripeForm.removePublishableKey}
+                    onChange={handleStripeCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove publishable key on save
+                </label>
+              </div>
+
+              <div className="space-y-2 lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">Stripe Webhook Secret</label>
+                <input
+                  type="password"
+                  name="webhookSecret"
+                  value={stripeForm.webhookSecret}
+                  onChange={handleStripeInputChange}
+                  placeholder="whsec_..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {stripeSettings?.hasWebhookSecret
+                    ? `Stored webhook secret: ${stripeSettings.webhookSecretPreview ?? '••••'}. Leave blank to keep.`
+                    : 'Set the signing secret for your Stripe webhook endpoint.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removeWebhookSecret"
+                    checked={stripeForm.removeWebhookSecret}
+                    onChange={handleStripeCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove webhook secret on save
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
+              <button
+                type="button"
+                onClick={handleStripeReset}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100"
+                disabled={stripeSaving}
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                disabled={stripeSaving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {stripeSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save Stripe Settings'
+                )}
+              </button>
+            </div>
+          </form>
+
+          {stripeLoading && (
+            <div className="bg-gray-50 px-6 py-3 text-sm text-gray-500 border-t border-gray-200">
+              Loading Stripe settings…
+            </div>
+          )}
+        </section>
+        )}
+
+        {activeTab === 'ai' && (
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">AI Integration</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage API keys used by Anthropic/Claude and OpenAI integrations powering the AI assistant.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadAiSettings}
+              disabled={aiLoading || aiSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 disabled:opacity-60"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
+
+          <form onSubmit={handleAiSubmit} className="px-6 py-6 space-y-6">
+            {aiError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {aiError}
+              </div>
+            )}
+
+            {aiSuccess && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                {aiSuccess}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Anthropic / Claude API Key</label>
+                <input
+                  type="password"
+                  name="anthropicApiKey"
+                  value={aiForm.anthropicApiKey}
+                  onChange={handleAiInputChange}
+                  placeholder="sk-ant-..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {aiSettings?.hasAnthropicKey
+                    ? `Stored key: ${aiSettings.anthropicKeyPreview ?? '••••'}. Leave blank to keep.`
+                    : 'Paste your Anthropic API key used for Claude requests.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removeAnthropicApiKey"
+                    checked={aiForm.removeAnthropicApiKey}
+                    onChange={handleAiCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove stored key on save
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Claude API Key (if different)</label>
+                <input
+                  type="password"
+                  name="claudeApiKey"
+                  value={aiForm.claudeApiKey}
+                  onChange={handleAiInputChange}
+                  placeholder="sk-ant-..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {aiSettings?.hasClaudeKey
+                    ? `Stored key: ${aiSettings.claudeKeyPreview ?? '••••'}. Leave blank to keep.`
+                    : 'If you use a separate key for Claude, paste it here. Otherwise leave blank.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removeClaudeApiKey"
+                    checked={aiForm.removeClaudeApiKey}
+                    onChange={handleAiCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove stored key on save
+                </label>
+              </div>
+
+              <div className="space-y-2 lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">OpenAI API Key</label>
+                <input
+                  type="password"
+                  name="openAiApiKey"
+                  value={aiForm.openAiApiKey}
+                  onChange={handleAiInputChange}
+                  placeholder="sk-..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-gray-500">
+                  {aiSettings?.hasOpenAiKey
+                    ? `Stored key: ${aiSettings.openAiKeyPreview ?? '••••'}. Leave blank to keep.`
+                    : 'Paste the OpenAI API key if you use GPT-based recommendations or voice synthesis.'}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    name="removeOpenAiApiKey"
+                    checked={aiForm.removeOpenAiApiKey}
+                    onChange={handleAiCheckboxChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Remove stored key on save
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
+              <button
+                type="button"
+                onClick={handleAiReset}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100"
+                disabled={aiSaving}
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                disabled={aiSaving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {aiSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save AI Settings'
+                )}
+              </button>
+            </div>
+          </form>
+
+          {aiLoading && (
+            <div className="bg-gray-50 px-6 py-3 text-sm text-gray-500 border-t border-gray-200">
+              Loading AI settings…
+            </div>
+          )}
+        </section>
+        )}
 
         {formOpen && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 px-4">

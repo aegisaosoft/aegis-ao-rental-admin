@@ -11,6 +11,7 @@ interface Company {
   logoUrl?: string;
   faviconUrl?: string;
   country?: string;
+  currency?: string;
   language?: string;
   motto?: string;
   mottoDescription?: string;
@@ -24,7 +25,9 @@ interface Company {
   bookingIntegrated?: boolean;
   taxId?: string;
   stripeAccountId?: string;
+  hasStripeAccount?: boolean;
   blinkKey?: string; // BlinkID license key for the company
+  aiIntegration?: string;
   texts?: string; // JSONB field - array of language objects with title and description
   isActive: boolean;
   createdAt?: string;
