@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
-import { UserPlus, Shield, Users, Pencil, Trash2, Power, CreditCard, RefreshCcw, Loader2 } from 'lucide-react';
+import { UserPlus, Shield, Users, Pencil, Trash2, Power, CreditCard, RefreshCcw, Loader2, Eye, EyeOff, Copy } from 'lucide-react';
 import userService, { AegisUser, SaveUserRequest } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
 import settingsService, { StripeSettingsResponse, UpdateStripeSettingsPayload, AiSettingsResponse, UpdateAiSettingsPayload } from '../services/settingsService';
@@ -56,6 +56,8 @@ const Settings: React.FC = () => {
   const [stripeSaving, setStripeSaving] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [stripeSuccess, setStripeSuccess] = useState<string | null>(null);
+  const [showStripeSecret, setShowStripeSecret] = useState(false);
+  const [showStripeWebhook, setShowStripeWebhook] = useState(false);
 
   const [aiSettings, setAiSettings] = useState<AiSettingsResponse | null>(null);
   const [aiForm, setAiForm] = useState<AiFormState>({
@@ -70,6 +72,9 @@ const Settings: React.FC = () => {
   const [aiSaving, setAiSaving] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuccess, setAiSuccess] = useState<string | null>(null);
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
+  const [showClaudeKey, setShowClaudeKey] = useState(false);
+  const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
   const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().toLowerCase();
@@ -117,6 +122,8 @@ const Settings: React.FC = () => {
         removeWebhookSecret: false,
       });
       setStripeSuccess(null);
+      setShowStripeSecret(false);
+      setShowStripeWebhook(false);
     } catch (err: any) {
       console.error('Failed to load Stripe settings', err);
       setStripeError(err.response?.data?.error || err.message || 'Failed to load Stripe settings');
@@ -142,6 +149,9 @@ const Settings: React.FC = () => {
         removeOpenAiApiKey: false,
       });
       setAiSuccess(null);
+      setShowAnthropicKey(false);
+      setShowClaudeKey(false);
+      setShowOpenAiKey(false);
     }
     catch (err: any)
     {
@@ -531,6 +541,28 @@ const Settings: React.FC = () => {
     return new Date(value).toLocaleString();
   };
 
+  const maskSecret = (value?: string | null) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (trimmed.length <= 8) {
+      const visible = trimmed.slice(-2);
+      return `${'*'.repeat(Math.max(trimmed.length - 2, 0))}${visible}`;
+    }
+    return `${trimmed.slice(0, 4)}********${trimmed.slice(-4)}`;
+  };
+
+  const handleCopy = async (value?: string | null, setMessage?: (msg: string | null) => void) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setMessage?.('Copied to clipboard.');
+      setTimeout(() => setMessage?.(null), 3000);
+    } catch (err) {
+      setMessage?.('Unable to copy to clipboard.');
+      setTimeout(() => setMessage?.(null), 3000);
+    }
+  };
+
   if (!authLoading && !canViewSettings) {
     return (
       <Layout>
@@ -792,6 +824,31 @@ const Settings: React.FC = () => {
                     ? `Stored key: ${stripeSettings.secretKeyPreview ?? '••••'}. Leave blank to keep.`
                     : 'No secret key stored yet. Paste your Stripe secret key to enable payouts.'}
                 </p>
+                {stripeSettings?.secretKey && (
+                  <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <span className="font-mono text-sm break-all select-all">
+                      {showStripeSecret ? stripeSettings.secretKey : maskSecret(stripeSettings.secretKey)}
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowStripeSecret(prev => !prev)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        {showStripeSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showStripeSecret ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(stripeSettings.secretKey, setStripeSuccess)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
@@ -848,6 +905,31 @@ const Settings: React.FC = () => {
                     ? `Stored webhook secret: ${stripeSettings.webhookSecretPreview ?? '••••'}. Leave blank to keep.`
                     : 'Set the signing secret for your Stripe webhook endpoint.'}
                 </p>
+                {stripeSettings?.webhookSecret && (
+                  <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <span className="font-mono text-sm break-all select-all">
+                      {showStripeWebhook ? stripeSettings.webhookSecret : maskSecret(stripeSettings.webhookSecret)}
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowStripeWebhook(prev => !prev)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        {showStripeWebhook ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showStripeWebhook ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(stripeSettings.webhookSecret, setStripeSuccess)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
@@ -945,6 +1027,31 @@ const Settings: React.FC = () => {
                     ? `Stored key: ${aiSettings.anthropicKeyPreview ?? '••••'}. Leave blank to keep.`
                     : 'Paste your Anthropic API key used for Claude requests.'}
                 </p>
+                {aiSettings?.anthropicApiKey && (
+                  <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <span className="font-mono text-sm break-all select-all">
+                      {showAnthropicKey ? aiSettings.anthropicApiKey : maskSecret(aiSettings.anthropicApiKey)}
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAnthropicKey(prev => !prev)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        {showAnthropicKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showAnthropicKey ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(aiSettings.anthropicApiKey, setAiSuccess)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
@@ -973,6 +1080,31 @@ const Settings: React.FC = () => {
                     ? `Stored key: ${aiSettings.claudeKeyPreview ?? '••••'}. Leave blank to keep.`
                     : 'If you use a separate key for Claude, paste it here. Otherwise leave blank.'}
                 </p>
+                {aiSettings?.claudeApiKey && (
+                  <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <span className="font-mono text-sm break-all select-all">
+                      {showClaudeKey ? aiSettings.claudeApiKey : maskSecret(aiSettings.claudeApiKey)}
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowClaudeKey(prev => !prev)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        {showClaudeKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showClaudeKey ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(aiSettings.claudeApiKey, setAiSuccess)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"
@@ -1001,6 +1133,31 @@ const Settings: React.FC = () => {
                     ? `Stored key: ${aiSettings.openAiKeyPreview ?? '••••'}. Leave blank to keep.`
                     : 'Paste the OpenAI API key if you use GPT-based recommendations or voice synthesis.'}
                 </p>
+                {aiSettings?.openAiApiKey && (
+                  <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                    <span className="font-mono text-sm break-all select-all">
+                      {showOpenAiKey ? aiSettings.openAiApiKey : maskSecret(aiSettings.openAiApiKey)}
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowOpenAiKey(prev => !prev)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        {showOpenAiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showOpenAiKey ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(aiSettings.openAiApiKey, setAiSuccess)}
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-gray-600">
                   <input
                     type="checkbox"

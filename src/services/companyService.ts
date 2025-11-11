@@ -13,6 +13,7 @@ interface Company {
   country?: string;
   currency?: string;
   language?: string;
+  securityDeposit?: number;
   motto?: string;
   mottoDescription?: string;
   about?: string;

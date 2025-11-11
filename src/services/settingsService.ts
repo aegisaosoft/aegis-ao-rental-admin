@@ -4,8 +4,10 @@ export interface StripeSettingsResponse {
   publishableKey: string;
   hasSecretKey: boolean;
   secretKeyPreview?: string | null;
+  secretKey?: string | null;
   hasWebhookSecret: boolean;
   webhookSecretPreview?: string | null;
+  webhookSecret?: string | null;
 }
 
 export interface UpdateStripeSettingsPayload {
@@ -20,10 +22,13 @@ export interface UpdateStripeSettingsPayload {
 export interface AiSettingsResponse {
   hasAnthropicKey: boolean;
   anthropicKeyPreview?: string | null;
+  anthropicApiKey?: string | null;
   hasClaudeKey: boolean;
   claudeKeyPreview?: string | null;
+  claudeApiKey?: string | null;
   hasOpenAiKey: boolean;
   openAiKeyPreview?: string | null;
+  openAiApiKey?: string | null;
 }
 
 export interface UpdateAiSettingsPayload {

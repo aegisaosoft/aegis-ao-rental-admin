@@ -134,6 +134,21 @@ const CompanyList: React.FC = () => {
         ),
       },
       {
+        accessorKey: 'securityDeposit',
+        header: 'Security Deposit',
+        cell: (info) => {
+          const value = info.getValue() as number | null | undefined;
+          if (value == null) {
+            return <span className="text-sm text-gray-400 italic">Not set</span>;
+          }
+          return (
+            <span className="text-sm text-gray-700 font-medium">
+              {new Intl.NumberFormat(undefined, { style: 'currency', currency: info.row.original.currency || 'USD', minimumFractionDigits: 0 }).format(value)}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: 'isActive',
         header: 'Status',
         cell: (info) => {
