@@ -76,7 +76,7 @@ const Settings: React.FC = () => {
   const [showClaudeKey, setShowClaudeKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
-  const [googleTranslateSettings, setGoogleTranslateSettings] = useState<GoogleTranslateSettingsResponse | null>(null);
+  const [_googleTranslateSettings, setGoogleTranslateSettings] = useState<GoogleTranslateSettingsResponse | null>(null);
   const [googleTranslateForm, setGoogleTranslateForm] = useState({
     apiKey: '',
   });

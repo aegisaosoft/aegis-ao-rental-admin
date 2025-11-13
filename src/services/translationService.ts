@@ -2,8 +2,6 @@
 import {
   TranslateRequest,
   TranslateAllRequest,
-  TranslateResponse,
-  TranslateAllResponse,
 } from '../types/translation.types';
 import api from './api';
 
