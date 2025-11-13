@@ -76,6 +76,7 @@ const Settings: React.FC = () => {
   const [showClaudeKey, setShowClaudeKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_googleTranslateSettings, setGoogleTranslateSettings] = useState<GoogleTranslateSettingsResponse | null>(null);
   const [googleTranslateForm, setGoogleTranslateForm] = useState({
     apiKey: '',
