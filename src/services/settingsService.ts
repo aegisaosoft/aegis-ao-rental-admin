@@ -40,6 +40,17 @@ export interface UpdateAiSettingsPayload {
   removeOpenAiApiKey?: boolean;
 }
 
+export interface GoogleTranslateSettingsResponse {
+  hasApiKey: boolean;
+  apiKeyPreview?: string | null;
+  apiKey?: string | null;
+}
+
+export interface UpdateGoogleTranslateSettingsPayload {
+  apiKey?: string;
+  removeApiKey?: boolean;
+}
+
 const unwrap = <T>(data: any): T => (data?.result !== undefined ? data.result : data);
 
 const settingsService = {
@@ -59,6 +70,15 @@ const settingsService = {
 
   async updateAiSettings(payload: UpdateAiSettingsPayload): Promise<void> {
     await api.put('/settings/ai', payload);
+  },
+
+  async getGoogleTranslateSettings(): Promise<GoogleTranslateSettingsResponse> {
+    const response = await api.get('/settings/google-translate');
+    return unwrap<GoogleTranslateSettingsResponse>(response.data);
+  },
+
+  async updateGoogleTranslateSettings(payload: UpdateGoogleTranslateSettingsPayload): Promise<void> {
+    await api.put('/settings/google-translate', payload);
   },
 };
 

@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { UserPlus, Shield, Users, Pencil, Trash2, Power, CreditCard, RefreshCcw, Loader2, Eye, EyeOff, Copy } from 'lucide-react';
 import userService, { AegisUser, SaveUserRequest } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
-import settingsService, { StripeSettingsResponse, UpdateStripeSettingsPayload, AiSettingsResponse, UpdateAiSettingsPayload } from '../services/settingsService';
+import settingsService, { StripeSettingsResponse, UpdateStripeSettingsPayload, AiSettingsResponse, UpdateAiSettingsPayload, GoogleTranslateSettingsResponse, UpdateGoogleTranslateSettingsPayload } from '../services/settingsService';
 
 type StripeFormState = {
   secretKey: string;
@@ -75,6 +75,15 @@ const Settings: React.FC = () => {
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showClaudeKey, setShowClaudeKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
+
+  const [googleTranslateSettings, setGoogleTranslateSettings] = useState<GoogleTranslateSettingsResponse | null>(null);
+  const [googleTranslateForm, setGoogleTranslateForm] = useState({
+    apiKey: '',
+  });
+  const [googleTranslateLoading, setGoogleTranslateLoading] = useState(false);
+  const [googleTranslateSaving, setGoogleTranslateSaving] = useState(false);
+  const [googleTranslateError, setGoogleTranslateError] = useState<string | null>(null);
+  const [googleTranslateSuccess, setGoogleTranslateSuccess] = useState<string | null>(null);
 
   const { user, loading: authLoading } = useAuth();
   const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().toLowerCase();
@@ -164,13 +173,43 @@ const Settings: React.FC = () => {
     }
   }, [canViewSettings]);
 
+  const loadGoogleTranslateSettings = useCallback(async () => {
+    if (!canViewSettings) return;
+    try {
+      setGoogleTranslateLoading(true);
+      setGoogleTranslateError(null);
+      const result = await settingsService.getGoogleTranslateSettings();
+      setGoogleTranslateSettings(result);
+      // Populate the form field with the key from database, or leave blank if none exists
+      setGoogleTranslateForm({
+        apiKey: result.apiKey || '',
+      });
+      setGoogleTranslateSuccess(null);
+    } catch (err: any) {
+      console.error('Failed to load Google Translate settings', err);
+      // If it's a 404, the endpoint might not exist yet - show a more helpful message
+      if (err.response?.status === 404) {
+        setGoogleTranslateError('Google Translate settings endpoint not found. Please ensure the backend API is updated.');
+      } else {
+        setGoogleTranslateError(err.response?.data?.error || err.message || 'Failed to load Google Translate settings');
+      }
+      // Reset form on error
+      setGoogleTranslateForm({
+        apiKey: '',
+      });
+    } finally {
+      setGoogleTranslateLoading(false);
+    }
+  }, [canViewSettings]);
+
   useEffect(() => {
      if (canViewSettings) {
        loadUsers();
        loadStripeSettings();
        loadAiSettings();
+       loadGoogleTranslateSettings();
      }
-  }, [canViewSettings, loadUsers, loadStripeSettings, loadAiSettings]);
+  }, [canViewSettings, loadUsers, loadStripeSettings, loadAiSettings, loadGoogleTranslateSettings]);
 
   const resetForm = () => {
     setFormData({
@@ -282,6 +321,49 @@ const Settings: React.FC = () => {
       removeClaudeApiKey: false,
       removeOpenAiApiKey: false,
     });
+  };
+
+  const handleGoogleTranslateInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setGoogleTranslateForm(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleGoogleTranslateReset = () => {
+    setGoogleTranslateError(null);
+    setGoogleTranslateSuccess(null);
+    setGoogleTranslateForm({
+      apiKey: '',
+    });
+  };
+
+  const handleGoogleTranslateSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setGoogleTranslateSaving(true);
+    setGoogleTranslateError(null);
+    setGoogleTranslateSuccess(null);
+
+    try {
+      const payload: UpdateGoogleTranslateSettingsPayload = {};
+
+      const trimmedKey = googleTranslateForm.apiKey.trim();
+      if (trimmedKey) {
+        // Only update if there's a value - if blank, don't change the existing key
+        payload.apiKey = trimmedKey;
+      }
+      // If field is blank, don't send anything - keep existing key in database
+
+      await settingsService.updateGoogleTranslateSettings(payload);
+      setGoogleTranslateSuccess('Google Translate settings updated successfully.');
+      await loadGoogleTranslateSettings();
+    } catch (err: any) {
+      console.error('Failed to update Google Translate settings', err);
+      setGoogleTranslateError(err.response?.data?.error || err.message || 'Failed to update Google Translate settings');
+    } finally {
+      setGoogleTranslateSaving(false);
+    }
   };
 
   const handleFormChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -772,12 +854,13 @@ const Settings: React.FC = () => {
         )}
 
         {activeTab === 'business' && (
+        <>
         <section className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-blue-600" />
-                Business Settings
+                Stripe Settings
               </h2>
               <p className="text-sm text-gray-500">
                 Manage the Stripe credentials used for payments across the platform.
@@ -873,20 +956,8 @@ const Settings: React.FC = () => {
                   autoComplete="off"
                 />
                 <p className="text-xs text-gray-500">
-                  {stripeSettings?.publishableKey
-                    ? 'Update the key or leave unchanged to keep the current value.'
-                    : 'Paste the publishable key used by your Stripe account.'}
+                  Paste the publishable key used by your Stripe account.
                 </p>
-                <label className="flex items-center gap-2 text-sm text-gray-600">
-                  <input
-                    type="checkbox"
-                    name="removePublishableKey"
-                    checked={stripeForm.removePublishableKey}
-                    onChange={handleStripeCheckboxChange}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  Remove publishable key on save
-                </label>
               </div>
 
               <div className="space-y-2 lg:col-span-2">
@@ -975,6 +1046,91 @@ const Settings: React.FC = () => {
             </div>
           )}
         </section>
+
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                Google Translate Settings
+              </h2>
+              <p className="text-sm text-gray-500">
+                Manage the Google Translate API key used for translation features across all companies.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadGoogleTranslateSettings}
+              disabled={googleTranslateLoading || googleTranslateSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 disabled:opacity-60"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
+
+          <form onSubmit={handleGoogleTranslateSubmit} className="px-6 py-6 space-y-6">
+            {googleTranslateError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {googleTranslateError}
+              </div>
+            )}
+
+            {googleTranslateSuccess && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                {googleTranslateSuccess}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Google Translate API Key</label>
+              <input
+                type="text"
+                name="apiKey"
+                value={googleTranslateForm.apiKey}
+                onChange={handleGoogleTranslateInputChange}
+                placeholder="Enter Google Translate API key"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                autoComplete="off"
+              />
+              <p className="text-xs text-gray-500">
+                Paste your Google Translate API key to enable translation features across all companies.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
+              <button
+                type="button"
+                onClick={handleGoogleTranslateReset}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100"
+                disabled={googleTranslateSaving}
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                disabled={googleTranslateSaving}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {googleTranslateSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save Google Translate Settings'
+                )}
+              </button>
+            </div>
+          </form>
+
+          {googleTranslateLoading && (
+            <div className="bg-gray-50 px-6 py-3 text-sm text-gray-500 border-t border-gray-200">
+              Loading Google Translate settings…
+            </div>
+          )}
+        </section>
+        </>
         )}
 
         {activeTab === 'ai' && (

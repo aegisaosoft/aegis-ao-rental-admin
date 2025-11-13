@@ -4,6 +4,8 @@ import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
 import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown } from 'lucide-react';
 import Layout from '../components/Layout';
+import { translationService } from '../services/translationService';
+import { SUPPORTED_LANGUAGES } from '../types/translation.types';
 
 // Country options grouped by continent
 const countriesByContinent = {
@@ -1150,6 +1152,7 @@ const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, v
   );
 };
 
+
 const CompanyForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1158,6 +1161,8 @@ const CompanyForm: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business' | 'ai'>('basic');
   const [activeLanguageTab, setActiveLanguageTab] = useState<string>('en');
+  const [translateFromLanguage, setTranslateFromLanguage] = useState<string>('en');
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
   
   const [formData, setFormData] = useState<Partial<Company>>({
     companyName: '',
@@ -1170,7 +1175,7 @@ const CompanyForm: React.FC = () => {
     country: '',
     currency: 'USD',
     language: 'en',
-    about: '',
+    about: JSON.stringify([createEmptySection()], null, 2),
     website: '',
     customCss: '',
     videoLink: '',
@@ -1184,7 +1189,6 @@ const CompanyForm: React.FC = () => {
     texts: undefined,
     isActive: true
   });
-  const [forceUsd, setForceUsd] = useState(false);
   const [hasStoredStripeAccount, setHasStoredStripeAccount] = useState(false);
   const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
 
@@ -1256,6 +1260,136 @@ const CompanyForm: React.FC = () => {
     }));
   }, []);
 
+  // Translate all untranslated fields - uses source language if it has content, otherwise finds best available source
+  const translateSections = useCallback(async (
+    sectionsJson: string,
+    sourceLanguage: string,
+    onTranslated: (translatedJson: string) => void
+  ) => {
+    if (!sectionsJson || sectionsJson.trim() === '') {
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const sections = JSON.parse(sectionsJson) as Section[];
+      const languageCodes = LANGUAGES.map(l => l.code);
+      const updatedSections = JSON.parse(JSON.stringify(sections)) as Section[]; // Deep clone
+
+      // Helper function to find the best source language for a field
+      const findBestSourceLanguage = (field: LocalizedTextMap | undefined): string | null => {
+        if (!field) return null;
+        // First try the selected source language
+        if (field[sourceLanguage]?.trim()) {
+          return sourceLanguage;
+        }
+        // Otherwise find the first language with content
+        for (const lang of languageCodes) {
+          if (field[lang]?.trim()) {
+            return lang;
+          }
+        }
+        return null;
+      };
+
+      // Helper function to translate a field
+      const translateField = async (
+        field: LocalizedTextMap | undefined,
+        fieldName: string,
+        sectionIndex: number,
+        noteIndex?: number
+      ): Promise<void> => {
+        if (!field) return;
+        
+        const bestSourceLang = findBestSourceLanguage(field);
+        if (!bestSourceLang) {
+          console.log(`No source text found for ${fieldName} in section ${sectionIndex}${noteIndex !== undefined ? ` note ${noteIndex}` : ''}`);
+          return;
+        }
+
+        const sourceText = field[bestSourceLang]?.trim() || '';
+        if (!sourceText) return;
+
+        // Find all languages that need translation (empty or missing)
+        const languagesToTranslate = languageCodes.filter(lang => {
+          const existingText = field[lang]?.trim() || '';
+          return lang !== bestSourceLang && !existingText;
+        });
+
+        if (languagesToTranslate.length === 0) {
+          console.log(`All languages already have content for ${fieldName} in section ${sectionIndex}${noteIndex !== undefined ? ` note ${noteIndex}` : ''}`);
+          return;
+        }
+
+        console.log(`Translating ${fieldName} from ${bestSourceLang} to ${languagesToTranslate.join(', ')} in section ${sectionIndex}${noteIndex !== undefined ? ` note ${noteIndex}` : ''}`);
+
+        // Translate to all missing languages
+        for (const targetLang of languagesToTranslate) {
+          try {
+            const translated = await translationService.translateText(
+              sourceText,
+              targetLang,
+              bestSourceLang
+            );
+            field[targetLang] = translated;
+            console.log(`✓ Translated ${fieldName} to ${targetLang}:`, translated.substring(0, 50) + '...');
+          } catch (error) {
+            console.error(`✗ Failed to translate ${fieldName} to ${targetLang}:`, error);
+          }
+        }
+      };
+
+      // Process each section
+      for (let sectionIndex = 0; sectionIndex < updatedSections.length; sectionIndex++) {
+        const section = updatedSections[sectionIndex];
+
+        // Translate title
+        await translateField(section.title, 'title', sectionIndex);
+
+        // Translate description
+        await translateField(section.description, 'description', sectionIndex);
+
+        // Translate notes
+        if (section.notes && Array.isArray(section.notes)) {
+          for (let noteIndex = 0; noteIndex < section.notes.length; noteIndex++) {
+            const note = section.notes[noteIndex];
+
+            // Translate note title
+            await translateField(note.title, 'note.title', sectionIndex, noteIndex);
+
+            // Translate note caption
+            await translateField(note.caption, 'note.caption', sectionIndex, noteIndex);
+
+            // Translate note text
+            await translateField(note.text, 'note.text', sectionIndex, noteIndex);
+          }
+        }
+      }
+
+      // Normalize sections to ensure all required fields are present
+      const normalizedSections = ensureSectionsNormalized(updatedSections);
+      
+      // Validate JSON before stringifying
+      try {
+        const translatedJson = JSON.stringify(normalizedSections, null, 2);
+        // Validate it can be parsed back
+        JSON.parse(translatedJson);
+        console.log('Translation complete. Translated JSON length:', translatedJson.length);
+        console.log('Translated sections count:', normalizedSections.length);
+        onTranslated(translatedJson);
+      } catch (jsonError) {
+        console.error('Failed to serialize translated sections:', jsonError);
+        alert('Failed to serialize translated data. Please check the console for details.');
+        throw jsonError;
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+      alert(`Translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsTranslating(false);
+    }
+  }, []);
+
   const handleAiPlanSelect = useCallback((value: AiIntegrationOption) => {
     setFormData(prev => ({
       ...prev,
@@ -1292,16 +1426,72 @@ const CompanyForm: React.FC = () => {
         (rest?.aiIntegration as string | undefined) ??
           (rest?.AiIntegration as string | undefined)
       );
+
+      // Migrate "about" field: if it's plain text or old format, convert to sections format (same as texts)
+      let normalizedAbout = rest?.about || '';
+      if (normalizedAbout && normalizedAbout.trim()) {
+        try {
+          // Try to parse as JSON
+          const parsed = JSON.parse(normalizedAbout);
+          // Check if it's already in sections format (array)
+          if (Array.isArray(parsed)) {
+            // Already in sections format, keep it
+            normalizedAbout = JSON.stringify(parsed, null, 2);
+          } else if (parsed?.content || parsed?.message) {
+            // Old format with content/message - convert to sections format
+            const sections = [{
+              backColor: '#ffffff',
+              foreColor: '#000000',
+              notesLayout: 'vertical',
+              alignment: 'left',
+              backgroundImage: { url: '' },
+              title: parsed.content || { en: '', es: '', pt: '', fr: '', de: '' },
+              description: parsed.message || { en: '', es: '', pt: '', fr: '', de: '' },
+              notes: []
+            }];
+            normalizedAbout = JSON.stringify(sections, null, 2);
+          } else {
+            // Plain text - migrate to sections format
+            const sections = [{
+              backColor: '#ffffff',
+              foreColor: '#000000',
+              notesLayout: 'vertical',
+              alignment: 'left',
+              backgroundImage: { url: '' },
+              title: { en: '', es: '', pt: '', fr: '', de: '' },
+              description: { en: normalizedAbout, es: '', pt: '', fr: '', de: '' },
+              notes: []
+            }];
+            normalizedAbout = JSON.stringify(sections, null, 2);
+          }
+        } catch {
+          // It's plain text - migrate to sections format
+          const sections = [{
+            backColor: '#ffffff',
+            foreColor: '#000000',
+            notesLayout: 'vertical',
+            alignment: 'left',
+            backgroundImage: { url: '' },
+            title: { en: '', es: '', pt: '', fr: '', de: '' },
+            description: { en: normalizedAbout, es: '', pt: '', fr: '', de: '' },
+            notes: []
+          }];
+          normalizedAbout = JSON.stringify(sections, null, 2);
+        }
+      } else {
+        // Empty or null - initialize with empty sections structure (same as texts)
+        normalizedAbout = JSON.stringify([createEmptySection()], null, 2);
+      }
  
       setFormData(prev => ({
         ...prev,
         ...rest,
         currency: resolvedCurrency,
         texts: normalizedTexts,
+        about: normalizedAbout,
         stripeAccountId: sanitizedStripeAccount,
         aiIntegration: incomingAiIntegration
       }));
-      setForceUsd(false);
     } catch (err: any) {
       console.error('Failed to load company:', err);
       setError(err.message || 'Failed to load company');
@@ -1361,20 +1551,15 @@ const CompanyForm: React.FC = () => {
       navigate('/companies');
     } catch (err: any) {
       console.error('Failed to save company:', err);
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save company';
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      console.error('Error message:', err.message);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.response?.data?.result?.error || err.message || 'Failed to save company';
       setError(errorMessage);
     } finally {
       setSaving(false);
     }
   };
-
-  const handleForceUsdToggle = useCallback((checked: boolean) => {
-    setForceUsd(checked);
-    setFormData(prev => ({
-      ...prev,
-      currency: (checked ? 'USD' : getCurrencyForCountry(prev.country)).toUpperCase()
-    }));
-  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -1386,9 +1571,6 @@ const CompanyForm: React.FC = () => {
         ...prev,
         currency: nextCurrency
       }));
-      if (nextCurrency !== 'USD' && forceUsd) {
-        setForceUsd(false);
-      }
       return;
     }
 
@@ -1404,13 +1586,6 @@ const CompanyForm: React.FC = () => {
     if (name === 'country') {
       const nextCountry = value;
       setFormData(prev => {
-        if (forceUsd) {
-          return {
-            ...prev,
-            country: nextCountry,
-            currency: 'USD'
-          };
-        }
         const prevSuggested = getCurrencyForCountry(prev.country).toUpperCase();
         const previousCurrency = (prev.currency || '').toUpperCase();
         const shouldUpdateCurrency =
@@ -1665,21 +1840,6 @@ const CompanyForm: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="inline-flex items-center gap-3 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={forceUsd}
-                    onChange={(event) => handleForceUsdToggle(event.target.checked)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                  />
-                  <span>Always use USD regardless of selected country</span>
-                </label>
-                <p className="mt-1 text-sm text-gray-500">
-                  When enabled, the company&rsquo;s prices stay in USD even if the country changes.
-                </p>
               </div>
 
               <div>
@@ -1968,21 +2128,21 @@ const CompanyForm: React.FC = () => {
 
           {/* Content Tab */}
           {activeTab === 'content' && (
-          <section className="space-y-4">
+          <>
+          <section className="space-y-4 pb-32">
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Content & Messaging</h2>
             
-            <div>
-              <label htmlFor="about" className="block text-sm font-medium text-gray-700 mb-2">
-                About
-              </label>
-              <textarea
-                id="about"
-                name="about"
+            <div className="pt-6">
+              <LanguageTextEditor
+                languageCode={activeLanguageTab}
                 value={formData.about || ''}
-                onChange={handleChange}
-                rows={4}
-                placeholder="Company description..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                onChange={(value) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    about: value
+                  }));
+                }}
+                openFilePicker={triggerFilePicker}
               />
             </div>
 
@@ -2029,7 +2189,9 @@ const CompanyForm: React.FC = () => {
               </p>
             </div>
           </section>
+          </>
           )}
+          
 
           {/* Texts Tab */}
           {activeTab === 'texts' && (
@@ -2045,22 +2207,69 @@ const CompanyForm: React.FC = () => {
               </div>
             </section>
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap gap-2 justify-center">
-                {LANGUAGES.map(lang => (
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div className="flex flex-wrap items-center gap-3 justify-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Translate from:</label>
+                    <select
+                      value={translateFromLanguage}
+                      onChange={(e) => setTranslateFromLanguage(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isTranslating}
+                    >
+                      {SUPPORTED_LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <button
-                    key={lang.code}
                     type="button"
-                    onClick={() => setActiveLanguageTab(lang.code)}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
-                      activeLanguageTab === lang.code
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    onClick={() => {
+                      const currentValue = formData.texts || '';
+                      translateSections(
+                        currentValue,
+                        translateFromLanguage,
+                        (translated) => {
+                          setFormData(prev => ({ ...prev, texts: translated }));
+                        }
+                      );
+                    }}
+                    disabled={isTranslating}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    <span>{lang.flag}</span>
-                    <span>{lang.name}</span>
+                    {isTranslating ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Translating...
+                      </>
+                    ) : (
+                      <>
+                        <span>🌐</span>
+                        Translate
+                      </>
+                    )}
                   </button>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {LANGUAGES.map(lang => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => setActiveLanguageTab(lang.code)}
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                        activeLanguageTab === lang.code
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </>
@@ -2287,6 +2496,76 @@ const CompanyForm: React.FC = () => {
             </button>
           </div>
         </form>
+        
+        {/* Language Bar for Content Tab - Outside form to ensure visibility */}
+        {activeTab === 'content' && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <div className="flex flex-wrap items-center gap-3 justify-center mb-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Translate from:</label>
+                  <select
+                    value={translateFromLanguage}
+                    onChange={(e) => setTranslateFromLanguage(e.target.value)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isTranslating}
+                  >
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentValue = formData.about || '';
+                    translateSections(
+                      currentValue,
+                      translateFromLanguage,
+                      (translated) => {
+                        setFormData(prev => ({ ...prev, about: translated }));
+                      }
+                    );
+                  }}
+                  disabled={isTranslating || translateFromLanguage === activeLanguageTab}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isTranslating ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Translating...
+                    </>
+                  ) : (
+                    <>
+                      <span>🌐</span>
+                      Translate
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => setActiveLanguageTab(lang.code)}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                      activeLanguageTab === lang.code
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
