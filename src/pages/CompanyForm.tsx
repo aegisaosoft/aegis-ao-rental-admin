@@ -2130,7 +2130,43 @@ const CompanyForm: React.FC = () => {
           {activeTab === 'content' && (
           <>
           <section className="space-y-4 pb-32">
-            <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Content & Messaging</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h2 className="text-2xl font-bold text-gray-900">Content & Messaging</h2>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('[CompanyForm] Clear Content button clicked, id:', id);
+                  if (!id) {
+                    alert('Company ID is missing');
+                    return;
+                  }
+                  if (window.confirm('Are you sure you want to clear all content? This will set the about field to null and the page will show default text.')) {
+                    try {
+                      console.log('[CompanyForm] Clearing about field for company:', id);
+                      const result = await companyService.clearCompanyAbout(id);
+                      console.log('[CompanyForm] Clear about result:', result);
+                      // Reload company data to get the updated state
+                      await loadCompany();
+                      alert('About field cleared successfully!');
+                    } catch (error: any) {
+                      console.error('[CompanyForm] Failed to clear about field:', error);
+                      console.error('[CompanyForm] Error details:', {
+                        message: error.message,
+                        response: error.response?.data,
+                        status: error.response?.status,
+                        statusText: error.response?.statusText
+                      });
+                      alert(`Failed to clear about field: ${error.response?.data?.error || error.message || 'Unknown error'}`);
+                    }
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+              >
+                Clear Content
+              </button>
+            </div>
             
             <div className="pt-6">
               <LanguageTextEditor

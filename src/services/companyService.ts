@@ -57,7 +57,7 @@ class CompanyService {
    */
   async getCompanyById(id: string): Promise<Company> {
     try {
-      const response = await api.get(`/companies/${id}`);
+      const response = await api.get(`/RentalCompanies/${id}`);
       // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
       return response.data.result || response.data;
     } catch (error) {
@@ -85,7 +85,7 @@ class CompanyService {
    */
   async updateCompany(id: string, companyData: Partial<Company>): Promise<Company> {
     try {
-      const response = await api.put(`/companies/${id}`, companyData);
+      const response = await api.put(`/RentalCompanies/${id}`, companyData);
       // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
       return response.data.result || response.data;
     } catch (error) {
@@ -102,6 +102,29 @@ class CompanyService {
       await api.delete(`/companies/${id}`);
     } catch (error) {
       console.error(`Failed to delete company ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear the About field for a company (admin only)
+   */
+  async clearCompanyAbout(id: string): Promise<Company> {
+    try {
+      console.log('[companyService] Calling DELETE /RentalCompanies/' + id + '/about');
+      const response = await api.delete(`/RentalCompanies/${id}/about`);
+      console.log('[companyService] Clear about response:', response);
+      // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
+      return response.data.result || response.data;
+    } catch (error: any) {
+      console.error(`[companyService] Failed to clear about field for company ${id}:`, error);
+      console.error('[companyService] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url
+      });
       throw error;
     }
   }

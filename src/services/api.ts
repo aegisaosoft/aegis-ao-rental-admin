@@ -20,6 +20,11 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Log DELETE requests for debugging
+    if (config.method === 'delete') {
+      const fullUrl = (config.baseURL || '') + (config.url || '');
+      console.log('[api] DELETE request:', config.url, 'Full URL:', fullUrl);
+    }
     return config;
   },
   (error) => {
