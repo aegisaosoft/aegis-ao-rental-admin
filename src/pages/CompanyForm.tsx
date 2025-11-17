@@ -1490,7 +1490,9 @@ const CompanyForm: React.FC = () => {
         texts: normalizedTexts,
         about: normalizedAbout,
         stripeAccountId: sanitizedStripeAccount,
-        aiIntegration: incomingAiIntegration
+        aiIntegration: incomingAiIntegration,
+        // Convert bookingIntegrated from string to boolean
+        bookingIntegrated: rest.bookingIntegrated === 'true' || rest.bookingIntegrated === true
       }));
     } catch (err: any) {
       console.error('Failed to load company:', err);
@@ -1541,6 +1543,15 @@ const CompanyForm: React.FC = () => {
         texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
 
+      console.log('[CompanyForm] Submitting data:', {
+        id,
+        dataKeys: Object.keys(submitData),
+        securityDeposit: submitData.securityDeposit,
+        currency: submitData.currency,
+        textsLength: submitData.texts?.length || 0,
+        fullData: submitData
+      });
+
       if (id) {
         await companyService.updateCompany(id, submitData);
         alert('Company updated successfully!');
@@ -1554,6 +1565,7 @@ const CompanyForm: React.FC = () => {
       console.error('Error response:', err.response?.data);
       console.error('Error status:', err.response?.status);
       console.error('Error message:', err.message);
+      console.error('Full error object:', JSON.stringify(err.response?.data, null, 2));
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.response?.data?.result?.error || err.message || 'Failed to save company';
       setError(errorMessage);
     } finally {
