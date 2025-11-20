@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(() => {
+  const [currentCompanyId] = useState<string | null>(() => {
     return localStorage.getItem('currentCompanyId');
   });
 
