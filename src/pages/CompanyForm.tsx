@@ -1186,8 +1186,11 @@ const CompanyForm: React.FC = () => {
     stripeAccountId: '',
     blinkKey: '',
     aiIntegration: 'claude',
+    securityDeposit: 1000,
+    isSecurityDepositMandatory: true,
     texts: undefined,
-    isActive: true
+    isActive: true,
+    isTestCompany: true
   });
   const [hasStoredStripeAccount, setHasStoredStripeAccount] = useState(false);
   const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
@@ -1492,7 +1495,9 @@ const CompanyForm: React.FC = () => {
         stripeAccountId: sanitizedStripeAccount,
         aiIntegration: incomingAiIntegration,
         // Convert bookingIntegrated from string to boolean
-        bookingIntegrated: rest.bookingIntegrated === 'true' || rest.bookingIntegrated === true
+        bookingIntegrated: rest.bookingIntegrated === 'true' || rest.bookingIntegrated === true,
+        // Ensure isTestCompany is loaded correctly (handle both camelCase and PascalCase)
+        isTestCompany: (rest as any).isTestCompany ?? (rest as any).IsTestCompany ?? true
       }));
     } catch (err: any) {
       console.error('Failed to load company:', err);
@@ -1540,6 +1545,9 @@ const CompanyForm: React.FC = () => {
             : undefined,
         aiIntegration: normalizeAiIntegration(formData.aiIntegration),
         blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
+        securityDeposit: formData.securityDeposit !== undefined ? formData.securityDeposit : 1000,
+        isSecurityDepositMandatory: formData.isSecurityDepositMandatory !== undefined ? formData.isSecurityDepositMandatory : true,
+        isTestCompany: formData.isTestCompany !== undefined ? formData.isTestCompany : true,
         texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
 
@@ -1748,6 +1756,25 @@ const CompanyForm: React.FC = () => {
             <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Basic Information</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="isTestCompany"
+                    name="isTestCompany"
+                    checked={formData.isTestCompany ?? true}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="block text-sm font-medium text-gray-700">
+                    Test Company
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  Mark this company as a test company
+                </p>
+              </div>
+
               <div>
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
                   {id ? 'Company Name (changing)' : 'Company Name'} <span className="text-red-600">*</span>

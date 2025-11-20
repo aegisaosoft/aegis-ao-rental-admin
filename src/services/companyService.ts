@@ -14,6 +14,7 @@ interface Company {
   currency?: string;
   language?: string;
   securityDeposit?: number;
+  isSecurityDepositMandatory?: boolean;
   motto?: string;
   mottoDescription?: string;
   about?: string;
@@ -31,6 +32,7 @@ interface Company {
   aiIntegration?: string;
   texts?: string; // JSONB field - array of language objects with title and description
   isActive: boolean;
+  isTestCompany?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

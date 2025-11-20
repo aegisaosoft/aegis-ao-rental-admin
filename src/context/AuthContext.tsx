@@ -67,6 +67,7 @@ interface AegisUser {
 interface AuthContextType {
   user: AegisUser | null;
   loading: boolean;
+  currentCompanyId: string | null;
   login: (credentials: { userId: string; password: string }) => Promise<void>;
   logout: () => void;
 }
@@ -121,6 +122,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(() => {
+    return localStorage.getItem('currentCompanyId');
+  });
 
   useEffect(() => {
     const initAuth = async () => {
@@ -204,7 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, currentCompanyId, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

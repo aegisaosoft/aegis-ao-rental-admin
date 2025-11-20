@@ -1,13 +1,25 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CompanyList from './pages/CompanyList';
 import CompanyForm from './pages/CompanyForm';
+import VehicleLocations from './pages/VehicleLocations';
 import ScrollToTop from './components/ScrollToTop';
 import Settings from './pages/Settings';
 import './App.css';
+
+// Create a QueryClient instance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
@@ -26,10 +38,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <ScrollToTop />
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route
             path="/dashboard"
@@ -71,10 +84,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/vehicle-locations"
+            element={
+              <ProtectedRoute>
+                <VehicleLocations />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
