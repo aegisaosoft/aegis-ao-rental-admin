@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
-import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown } from 'lucide-react';
+import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown, Calendar } from 'lucide-react';
 import Layout from '../components/Layout';
 import { translationService } from '../services/translationService';
 import { SUPPORTED_LANGUAGES } from '../types/translation.types';
+import { useQuery } from '@tanstack/react-query';
+import api from '../services/api';
 
 // Country options grouped by continent
 const countriesByContinent = {
@@ -1152,6 +1154,232 @@ const LanguageTextEditor: React.FC<LanguageTextEditorProps> = ({ languageCode, v
   );
 };
 
+// Reservations Tab Component
+interface ReservationsTabProps {
+  companyId: string;
+}
+
+const ReservationsTab: React.FC<ReservationsTabProps> = ({ companyId }) => {
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['companyReservations', companyId, page],
+    queryFn: async () => {
+      const response = await api.get(`/booking/companies/${companyId}/bookings`, {
+        params: {
+          page,
+          pageSize
+        }
+      });
+      return response.data;
+    },
+    enabled: !!companyId
+  });
+
+  const bookings = React.useMemo(() => {
+    if (!data) return [];
+    // Handle various response structures
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.bookings)) return data.bookings;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.result)) return data.result;
+    return [];
+  }, [data]);
+
+  const totalCount = data?.totalCount || data?.total || bookings.length;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  const getStatusColor = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'confirmed':
+        return 'bg-green-100 text-green-800';
+      case 'active':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  const formatPrice = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined) return 'N/A';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900 border-b pb-2 flex-1">
+          Reservations
+        </h2>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {isLoading && (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading reservations...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-sm text-red-800">
+            Error loading reservations: {error instanceof Error ? error.message : 'Unknown error'}
+          </p>
+        </div>
+      )}
+
+      {!isLoading && !error && bookings.length === 0 && (
+        <div className="text-center py-8">
+          <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2 text-sm text-gray-600">No reservations found</p>
+        </div>
+      )}
+
+      {!isLoading && !error && bookings.length > 0 && (
+        <>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Booking #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vehicle
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pickup Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Return Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {bookings.map((booking: any) => (
+                  <tr key={booking.id || booking.Id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {booking.bookingNumber || booking.BookingNumber || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {booking.customerName || booking.CustomerName || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {booking.vehicleName || booking.VehicleName || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(booking.pickupDate || booking.PickupDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(booking.returnDate || booking.ReturnDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(booking.status || booking.Status)}`}>
+                        {booking.status || booking.Status || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatPrice(booking.totalAmount || booking.TotalAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+              <div className="flex flex-1 justify-between sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{(page - 1) * pageSize + 1}</span> to{' '}
+                    <span className="font-medium">{Math.min(page * pageSize, totalCount)}</span> of{' '}
+                    <span className="font-medium">{totalCount}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+};
 
 const CompanyForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -1159,7 +1387,7 @@ const CompanyForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business' | 'ai'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'design' | 'content' | 'texts' | 'business' | 'ai' | 'reservations'>('basic');
   const [activeLanguageTab, setActiveLanguageTab] = useState<string>('en');
   const [translateFromLanguage, setTranslateFromLanguage] = useState<string>('en');
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
@@ -1745,6 +1973,19 @@ const CompanyForm: React.FC = () => {
               >
                 AI Integration
               </button>
+              {id && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('reservations')}
+                  className={`${
+                    activeTab === 'reservations'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+                >
+                  Reservations
+                </button>
+              )}
             </nav>
           </div>
 
@@ -2428,6 +2669,11 @@ const CompanyForm: React.FC = () => {
               Ensure the provider you select has valid credentials configured there.
             </div>
           </section>
+          )}
+
+          {/* Reservations Tab */}
+          {activeTab === 'reservations' && id && (
+            <ReservationsTab companyId={id} />
           )}
 
           {/* Business Tab */}
