@@ -4,6 +4,22 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Suppress WebSocket connection errors from React HMR (harmless)
+window.addEventListener('error', (event) => {
+  if (event.message && event.message.includes('WebSocket connection')) {
+    event.preventDefault();
+    return false;
+  }
+});
+
+// Suppress unhandled promise rejections for WebSocket
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && typeof event.reason === 'string' && event.reason.includes('WebSocket')) {
+    event.preventDefault();
+    return false;
+  }
+});
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );

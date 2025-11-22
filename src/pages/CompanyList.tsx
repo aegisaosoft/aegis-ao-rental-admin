@@ -11,7 +11,7 @@ import {
   SortingState,
 } from '@tanstack/react-table';
 import companyService, { Company } from '../services/companyService';
-import { Building2, Plus, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, Plus, Trash2, Edit, ChevronLeft, ChevronRight, CreditCard } from 'lucide-react';
 import Layout from '../components/Layout';
 
 const CompanyList: React.FC = () => {
@@ -69,6 +69,13 @@ const CompanyList: React.FC = () => {
                 title="Edit"
               >
                 <Edit className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => navigate(`/companies/${company.id}/stripe`)}
+                className="text-purple-600 hover:text-purple-800 p-1 hover:bg-purple-50 rounded"
+                title="Manage Stripe Account"
+              >
+                <CreditCard className="h-5 w-5" />
               </button>
               <button
                 onClick={() => handleDelete(company.id, company.companyName)}

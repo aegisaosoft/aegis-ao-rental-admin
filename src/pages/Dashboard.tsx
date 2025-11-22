@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Building2 } from 'lucide-react';
+import { Settings, Building2, CreditCard } from 'lucide-react';
 import Layout from '../components/Layout';
 
 const Dashboard = () => {
@@ -62,6 +62,15 @@ const Dashboard = () => {
                 <Settings className="h-6 w-6 text-blue-600 mb-2" />
                 <p className="font-medium text-gray-900">Settings</p>
                 <p className="text-sm text-gray-500">Manage app settings</p>
+              </button>
+            )}
+            {canAccessSettings && (
+              <button 
+                onClick={() => navigate('/stripe-settings')}
+                className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors">
+                <CreditCard className="h-6 w-6 text-blue-600 mb-2" />
+                <p className="font-medium text-gray-900">Stripe Settings</p>
+                <p className="text-sm text-gray-500">Manage Stripe configurations</p>
               </button>
             )}
           </div>

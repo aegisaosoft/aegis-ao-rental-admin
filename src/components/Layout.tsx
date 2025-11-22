@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Car, LogOut, Building2, Home, Settings as SettingsIcon } from 'lucide-react';
+import { Car, LogOut, Building2, Home, Settings as SettingsIcon, CreditCard } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -76,13 +76,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button
                 onClick={() => navigate('/settings')}
                 className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                  pathname.startsWith('/settings')
+                  pathname.startsWith('/settings') && !pathname.startsWith('/stripe-settings')
                     ? 'bg-blue-700 text-white'
                     : 'text-blue-100 hover:bg-blue-700 hover:text-white'
                 }`}
               >
                 <SettingsIcon className="h-4 w-4" />
                 <span className="text-sm font-medium">Settings</span>
+              </button>
+            )}
+            {canAccessSettings && (
+              <button
+                onClick={() => navigate('/stripe-settings')}
+                className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                  pathname.startsWith('/stripe-settings')
+                    ? 'bg-blue-700 text-white'
+                    : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                }`}
+              >
+                <CreditCard className="h-4 w-4" />
+                <span className="text-sm font-medium">Stripe Settings</span>
               </button>
             )}
 

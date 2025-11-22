@@ -37,10 +37,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
+      // Unauthorized - token invalid or session expired
+      // Clear token and user info
       localStorage.removeItem('token');
       localStorage.removeItem('aegisUser');
-      window.location.href = '/login';
+      // Only redirect if we're not already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

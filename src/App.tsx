@@ -9,6 +9,8 @@ import CompanyForm from './pages/CompanyForm';
 import VehicleLocations from './pages/VehicleLocations';
 import ScrollToTop from './components/ScrollToTop';
 import Settings from './pages/Settings';
+import StripeSettings from './pages/StripeSettings';
+import CompanyStripeManagement from './pages/CompanyStripeManagement';
 import './App.css';
 
 // Create a QueryClient instance
@@ -61,6 +63,14 @@ function App() {
             }
           />
           <Route
+            path="/companies/:companyId/stripe"
+            element={
+              <ProtectedRoute>
+                <CompanyStripeManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/companies/new"
             element={
               <ProtectedRoute>
@@ -81,6 +91,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stripe-settings"
+            element={
+              <ProtectedRoute>
+                <StripeSettings />
               </ProtectedRoute>
             }
           />

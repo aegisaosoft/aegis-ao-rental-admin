@@ -129,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initAuth = async () => {
       if (token) {
-        debugLog('Token found, loading profile...');
+        debugLog('Token found, validating session...');
         try {
           const response = await api.get('/aegis-admin/profile');
           debugGroup('Profile response', () => {
@@ -150,14 +150,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem('aegisUser', JSON.stringify(normalized));
           } else {
             console.warn('[AuthContext] Profile response did not include user payload', payload);
+            // Invalid session - clear and redirect
+            localStorage.removeItem('token');
+            localStorage.removeItem('aegisUser');
+            setToken(null);
+            setUser(null);
+            window.location.href = '/login';
+            return;
           }
         } catch (error: any) {
-          if (error.response?.status !== 401) {
-            console.error('Auth initialization error:', error);
-          }
+          // Token invalid or session expired - redirect to login
+          console.warn('[AuthContext] Session validation failed:', error.response?.status || error.message);
           localStorage.removeItem('token');
           localStorage.removeItem('aegisUser');
           setToken(null);
+          setUser(null);
+          // Only redirect if we're not already on login page
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
+      } else {
+        // No token - redirect to login if not already there
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
         }
       }
       setLoading(false);

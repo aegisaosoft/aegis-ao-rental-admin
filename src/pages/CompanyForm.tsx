@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
-import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown, Calendar } from 'lucide-react';
+import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown, Calendar, CreditCard, ExternalLink } from 'lucide-react';
 import Layout from '../components/Layout';
 import { translationService } from '../services/translationService';
 import { SUPPORTED_LANGUAGES } from '../types/translation.types';
@@ -176,6 +176,48 @@ const CURRENCY_OPTIONS = [
 const getCurrencyForCountry = (country?: string | null): string => {
   const normalized = country?.trim().toLowerCase() ?? '';
   return COUNTRY_CURRENCY_MAP[normalized] || 'USD';
+};
+
+// Stripe Settings Dropdown Component
+interface StripeSettingsDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const StripeSettingsDropdown: React.FC<StripeSettingsDropdownProps> = ({ value, onChange }) => {
+  const { data: stripeSettings, isLoading } = useQuery({
+    queryKey: ['stripeSettings'],
+    queryFn: async () => {
+      const response = await api.get('/StripeSettings');
+      return response.data.result || response.data || [];
+    },
+  });
+
+  return (
+    <div>
+      <label htmlFor="stripeSettingsId" className="block text-sm font-medium text-gray-700 mb-2">
+        Stripe Settings
+      </label>
+      <select
+        id="stripeSettingsId"
+        name="stripeSettingsId"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+        disabled={isLoading}
+      >
+        <option value="">-- Select Stripe Settings --</option>
+        {stripeSettings?.map((setting: any) => (
+          <option key={setting.id} value={setting.id}>
+            {setting.name}
+          </option>
+        ))}
+      </select>
+      <p className="mt-2 text-sm text-gray-500">
+        Select the Stripe settings configuration to use for this company's payments.
+      </p>
+    </div>
+  );
 };
 
 const SVG_ICON_OPTIONS: { value: string; label: string }[] = [
@@ -1410,8 +1452,8 @@ const CompanyForm: React.FC = () => {
     bannerLink: '',
     backgroundLink: '',
     bookingIntegrated: false,
-    taxId: '',
     stripeAccountId: '',
+    stripeSettingsId: '',
     blinkKey: '',
     aiIntegration: 'claude',
     securityDeposit: 1000,
@@ -1721,6 +1763,7 @@ const CompanyForm: React.FC = () => {
         texts: normalizedTexts,
         about: normalizedAbout,
         stripeAccountId: sanitizedStripeAccount,
+        stripeSettingsId: (rest as any)?.stripeSettingsId || (rest as any)?.StripeSettingsId || '',
         aiIntegration: incomingAiIntegration,
         // Convert bookingIntegrated from string to boolean
         bookingIntegrated: rest.bookingIntegrated === 'true' || rest.bookingIntegrated === true,
@@ -1765,12 +1808,12 @@ const CompanyForm: React.FC = () => {
         videoLink: formData.videoLink && formData.videoLink.trim() ? formData.videoLink : undefined,
         bannerLink: formData.bannerLink && formData.bannerLink.trim() ? formData.bannerLink : undefined,
         backgroundLink: formData.backgroundLink && formData.backgroundLink.trim() ? formData.backgroundLink : undefined,
-        taxId: formData.taxId && formData.taxId.trim() ? formData.taxId : undefined,
         stripeAccountId: removeStripeAccount
           ? ''
           : formData.stripeAccountId && formData.stripeAccountId.trim()
             ? formData.stripeAccountId.trim()
             : undefined,
+        stripeSettingsId: formData.stripeSettingsId && formData.stripeSettingsId.trim() ? formData.stripeSettingsId : undefined,
         aiIntegration: normalizeAiIntegration(formData.aiIntegration),
         blinkKey: formData.blinkKey && formData.blinkKey.trim() ? formData.blinkKey : undefined,
         securityDeposit: formData.securityDeposit !== undefined ? formData.securityDeposit : 1000,
@@ -2680,65 +2723,26 @@ const CompanyForm: React.FC = () => {
           {activeTab === 'business' && (
           <>
           <section className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 border-b pb-2">Business Information</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h2 className="text-2xl font-bold text-gray-900">Business Information</h2>
+              {id && (
+                <button
+                  onClick={() => navigate(`/companies/${id}/stripe`)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  <span>Manage Stripe Account</span>
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 mb-2">
-                  Tax ID
-                </label>
-                <input
-                  type="text"
-                  id="taxId"
-                  name="taxId"
-                  value={formData.taxId || ''}
-                  onChange={handleChange}
-                  placeholder="12-3456789"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                <StripeSettingsDropdown
+                  value={formData.stripeSettingsId || ''}
+                  onChange={(value) => setFormData(prev => ({ ...prev, stripeSettingsId: value }))}
                 />
-              </div>
-
-              <div>
-                <label htmlFor="stripeAccountId" className="block text-sm font-medium text-gray-700 mb-2">
-                  Stripe Account ID
-                </label>
-                <input
-                  type="text"
-                  id="stripeAccountId"
-                  name="stripeAccountId"
-                  value={formData.stripeAccountId || ''}
-                  onChange={handleChange}
-                  placeholder="acct_1234567890"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  autoComplete="off"
-                />
-                {hasStoredStripeAccount ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-sm text-gray-500">
-                      A Stripe account is already stored securely. Leave this field blank to keep it, enter a new ID to
-                      replace it, or check the box below to remove it.
-                    </p>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        checked={removeStripeAccount}
-                        onChange={(e) => {
-                          setRemoveStripeAccount(e.target.checked);
-                          if (e.target.checked) {
-                            setFormData(prev => ({ ...prev, stripeAccountId: '' }));
-                          }
-                        }}
-                      />
-                      Remove stored Stripe account ID on save
-                    </label>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-gray-500">
-                    Paste the Stripe connected account ID (e.g., acct_123…) to link payouts. The value will be hidden after
-                    saving.
-                  </p>
-                )}
               </div>
 
             </div>
