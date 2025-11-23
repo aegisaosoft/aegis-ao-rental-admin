@@ -1442,7 +1442,7 @@ const CompanyForm: React.FC = () => {
     secondaryColor: '#6c757d',
     logoUrl: '',
     faviconUrl: '',
-    country: '',
+    country: 'United States',
     currency: 'USD',
     language: 'en',
     about: JSON.stringify([createEmptySection()], null, 2),
@@ -1759,6 +1759,7 @@ const CompanyForm: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         ...rest,
+        country: rest.country && rest.country.trim() ? rest.country : 'United States', // Default to United States if empty
         currency: resolvedCurrency,
         texts: normalizedTexts,
         about: normalizedAbout,
@@ -1836,7 +1837,8 @@ const CompanyForm: React.FC = () => {
         alert('Company updated successfully!');
       } else {
         await companyService.createCompany(submitData);
-        alert('Company created successfully!\n\nNext steps:\n1. Set subdomain manually if not set\n2. Add DNS CNAME record (if subdomain set)\n3. Configure custom domain in Azure\n4. Set up SSL certificate');
+        // Domain setup runs in background - all steps are automated
+        alert('Company created successfully!\n\n✅ Domain setup is running automatically in the background:\n• DNS CNAME record creation\n• App Service custom domain binding\n• SSL certificate configuration\n\nThis may take 2-5 minutes to complete. You can check the status in Azure Portal.');
       }
       navigate('/companies');
     } catch (err: any) {
@@ -1912,6 +1914,21 @@ const CompanyForm: React.FC = () => {
 
   return (
     <Layout>
+      {/* Full-page spinner overlay when saving */}
+      {saving && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-lg font-medium text-gray-700">
+              {id ? 'Updating company...' : 'Creating company...'}
+            </p>
+            <p className="text-sm text-gray-500">
+              {id ? 'Please wait while we update your company.' : 'Please wait while we create your company and set up the domain.'}
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -2124,11 +2141,10 @@ const CompanyForm: React.FC = () => {
                     <select
                       id="country"
                       name="country"
-                      value={formData.country || ''}
+                      value={formData.country || 'United States'}
                       onChange={handleChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="">Select Country</option>
                       {Object.entries(countriesByContinent).map(([continent, countries]) => (
                         <optgroup key={continent} label={continent}>
                           {countries.map((country) => (
