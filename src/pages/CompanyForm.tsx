@@ -1462,7 +1462,6 @@ const CompanyForm: React.FC = () => {
     isActive: true,
     isTestCompany: true
   });
-  const [hasStoredStripeAccount, setHasStoredStripeAccount] = useState(false);
   const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
 
   const normalizedSubdomain =
@@ -1690,8 +1689,6 @@ const CompanyForm: React.FC = () => {
       const resolvedCurrency = (data?.currency || getCurrencyForCountry(data?.country)).toUpperCase();
 
       const sanitizedStripeAccount = '';
-      const hasStripe = Boolean((data as any)?.hasStripeAccount || (data as any)?.stripeAccountId);
-      setHasStoredStripeAccount(hasStripe);
       setRemoveStripeAccount(false);
 
       const { hasStripeAccount, ...rest } = (data as any) ?? {};

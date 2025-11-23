@@ -74,7 +74,7 @@ const CompanyStripeManagement: React.FC = () => {
   });
 
   // Fetch Stripe account status
-  const { data: status, isLoading: statusLoading, error: statusError, refetch: refetchStatus } = useQuery<StripeAccountStatus>({
+  const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useQuery<StripeAccountStatus>({
     queryKey: ['stripeStatus', companyId],
     queryFn: async () => {
       try {
