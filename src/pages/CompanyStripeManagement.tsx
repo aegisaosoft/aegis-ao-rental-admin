@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { 
   CreditCard, 
@@ -13,7 +13,9 @@ import {
   RotateCcw,
   Trash2,
   ArrowLeft,
-  Search
+  Search,
+  Copy,
+  Check
 } from 'lucide-react';
 import api from '../services/api';
 import companyService, { Company as CompanyServiceType } from '../services/companyService';
@@ -48,14 +50,10 @@ const CompanyStripeManagement: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [suspendReason, setSuspendReason] = useState('terms_of_service');
   const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('[CompanyStripeManagement] Mounted with companyId:', companyId);
-    console.log('[CompanyStripeManagement] Current pathname:', window.location.pathname);
-  }, [companyId]);
+  const [copied, setCopied] = useState(false);
 
   // Fetch company details (hooks must be called before any conditional returns)
   const { data: company, isLoading: companyLoading, error: companyError } = useQuery<Company>({
@@ -63,33 +61,43 @@ const CompanyStripeManagement: React.FC = () => {
     queryFn: async () => {
       // Use companyService to get company data (same as CompanyForm)
       const companyData = await companyService.getCompanyById(companyId!);
-      console.log('[CompanyStripeManagement] Company data loaded:', {
-        id: companyData?.id,
-        companyName: companyData?.companyName
-      });
       return companyData;
     },
     enabled: !!companyId,
     retry: false,
   });
 
+  // Initialize onboarding URL from company data if available
+  React.useEffect(() => {
+    if (company) {
+      const companyLink = (company as any)?.stripeOnboardingLink;
+      if (companyLink && !onboardingUrl) {
+        console.log('[CompanyStripeManagement] Loading onboarding link from company data:', companyLink);
+        setOnboardingUrl(companyLink);
+      }
+    }
+  }, [company, onboardingUrl]);
+
+  // Debug: Log when onboardingUrl state changes
+  React.useEffect(() => {
+    console.log('[CompanyStripeManagement] onboardingUrl state changed to:', onboardingUrl);
+  }, [onboardingUrl]);
+
   // Fetch Stripe account status
   const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useQuery<StripeAccountStatus>({
     queryKey: ['stripeStatus', companyId],
     queryFn: async () => {
       try {
-        console.log('[CompanyStripeManagement] Fetching Stripe status for company:', companyId);
         const response = await api.get(`/companies/${companyId}/stripe/status`);
-        console.log('[CompanyStripeManagement] Stripe status response:', response.data);
-        return response.data;
-      } catch (error: any) {
-        console.error('[CompanyStripeManagement] Error fetching Stripe status:', error);
-        console.error('[CompanyStripeManagement] Error response:', error.response?.data);
-        console.error('[CompanyStripeManagement] Error status:', error.response?.status);
         
+        // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
+        // Unwrap it like other services do
+        const statusData = response.data.result || response.data;
+        
+        return statusData;
+      } catch (error: any) {
         // If 404, the company might not have a Stripe account yet
         if (error.response?.status === 404) {
-          console.log('[CompanyStripeManagement] No Stripe account found (404), returning not_started');
           return {
             stripeAccountId: undefined,
             chargesEnabled: false,
@@ -100,11 +108,6 @@ const CompanyStripeManagement: React.FC = () => {
             requirementsCurrentlyDue: [],
             requirementsPastDue: [],
           } as StripeAccountStatus;
-        }
-        
-        // For 500 or other errors, log but still return default
-        if (error.response?.status === 500) {
-          console.error('[CompanyStripeManagement] Server error (500) fetching Stripe status');
         }
         
         // Return default status for any error
@@ -122,7 +125,9 @@ const CompanyStripeManagement: React.FC = () => {
     },
     enabled: !!companyId,
     retry: false,
-    // Poll every 10 seconds if account exists and is in onboarding or has requirements
+    // Auto-sync from Stripe if account is in onboarding state
+    refetchOnMount: true,
+    // Poll every 30 seconds if account exists and is in onboarding or has requirements
     // This ensures UI updates after webhook events
     refetchInterval: (query) => {
       const data = query.state.data as StripeAccountStatus | undefined;
@@ -148,6 +153,7 @@ const CompanyStripeManagement: React.FC = () => {
     },
   });
 
+
   // Setup Stripe account mutation
   const setupMutation = useMutation({
     mutationFn: async () => {
@@ -161,6 +167,84 @@ const CompanyStripeManagement: React.FC = () => {
     onError: (error: any) => {
       console.error('[CompanyStripeManagement] Setup error:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to create Stripe account';
+      alert(`Error: ${errorMessage}`);
+    },
+  });
+
+  // Get onboarding link mutation
+  const getOnboardingLinkMutation = useMutation({
+    mutationFn: async () => {
+      console.log('[CompanyStripeManagement] mutationFn called, fetching onboarding link...');
+      console.log('[CompanyStripeManagement] companyId:', companyId);
+      try {
+        // Add json query parameter to get JSON response instead of redirect
+        const response = await api.get(`/companies/${companyId}/stripe/reauth?json=true`, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        console.log('[CompanyStripeManagement] Raw API response:', response);
+        console.log('[CompanyStripeManagement] Raw API response.data:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('[CompanyStripeManagement] Error in mutationFn:', error);
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
+      console.log('[CompanyStripeManagement] onSuccess called with data:', data);
+      console.log('[CompanyStripeManagement] Data type:', typeof data);
+      console.log('[CompanyStripeManagement] Data keys:', data ? Object.keys(data) : 'null');
+      
+      // The API wraps responses in { result: data, reason: 0 }
+      // Try multiple ways to extract the URL
+      let url: string | null = null;
+      
+      // Check if data is already the URL string
+      if (typeof data === 'string' && data.startsWith('http')) {
+        url = data;
+      }
+      // Check if wrapped in result
+      else if (data?.result) {
+        const result = data.result;
+        url = result?.url || result?.onboardingUrl || (typeof result === 'string' ? result : null);
+      }
+      // Check if direct properties
+      else if (data) {
+        url = data.url || data.onboardingUrl || (typeof data === 'string' ? data : null);
+      }
+      
+      console.log('[CompanyStripeManagement] Extracted URL:', url);
+      
+      if (url) {
+        console.log('[CompanyStripeManagement] Setting onboarding URL state:', url);
+        setOnboardingUrl(url);
+        // Optionally open in new tab
+        window.open(url, '_blank');
+      } else {
+        console.warn('[CompanyStripeManagement] No URL found in response. Full data:', JSON.stringify(data, null, 2));
+        alert('Warning: Onboarding link was received but could not be extracted. Check console for details.');
+      }
+      queryClient.invalidateQueries({ queryKey: ['stripeStatus', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company', companyId] });
+    },
+    onError: (error: any) => {
+      console.error('[CompanyStripeManagement] Get onboarding link error:', error);
+      const errorData = error.response?.data;
+      let errorMessage = 'Failed to get onboarding link';
+      
+      if (errorData) {
+        // Combine error and message fields for better user feedback
+        const parts = [];
+        if (errorData.error) parts.push(errorData.error);
+        if (errorData.message && errorData.message !== errorData.error) {
+          parts.push(errorData.message);
+        }
+        errorMessage = parts.length > 0 ? parts.join(': ') : errorData.message || errorData.error || errorMessage;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       alert(`Error: ${errorMessage}`);
     },
   });
@@ -198,6 +282,9 @@ const CompanyStripeManagement: React.FC = () => {
     },
   });
 
+  // Track if this is an auto-sync (to avoid showing alerts)
+  const [isAutoSync, setIsAutoSync] = React.useState(false);
+
   // Sync/Find account mutation
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -206,14 +293,65 @@ const CompanyStripeManagement: React.FC = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['stripeStatus', companyId] });
-      alert('Account status synced successfully from Stripe!');
+      // Only show alert for manual syncs, not auto-syncs
+      if (!isAutoSync) {
+        alert('Account status synced successfully from Stripe!');
+      }
+      setIsAutoSync(false); // Reset flag
     },
     onError: (error: any) => {
       console.error('[CompanyStripeManagement] Sync error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to sync account';
-      alert(`Error: ${errorMessage}`);
+      // Only show alert for manual syncs, not auto-syncs
+      if (!isAutoSync) {
+        alert(`Error: ${errorMessage}`);
+      }
+      setIsAutoSync(false); // Reset flag
     },
   });
+
+  // Auto-sync from Stripe when page loads if account is in onboarding state
+  // Also auto-sync when returning from Stripe onboarding complete page
+  React.useEffect(() => {
+    if (!status || !companyId) return;
+
+    const accountStatus = (status.accountStatus || status.AccountStatus || 'not_started').toLowerCase();
+    const hasAccount = !!(status.stripeAccountId || status.StripeAccountId);
+    const isOnboarding = accountStatus === 'onboarding' || !(status.onboardingCompleted ?? status.OnboardingCompleted);
+    const lastSyncAt = status.lastSyncAt || status.LastSyncAt;
+    
+    // Check if we're returning from the complete page (URL contains /complete or state indicates it)
+    const isReturningFromComplete = location.pathname.includes('/complete') || 
+      location.state?.fromComplete === true;
+    
+    // Auto-sync if:
+    // 1. Account exists
+    // 2. (Account is in onboarding state OR returning from complete page)
+    // 3. Either never synced, or last sync was more than 2 minutes ago (or immediately if returning from complete)
+    if (hasAccount && (isOnboarding || isReturningFromComplete)) {
+      const timeSinceLastSync = lastSyncAt ? (new Date().getTime() - new Date(lastSyncAt).getTime()) : Infinity;
+      const shouldSync = !lastSyncAt || 
+        timeSinceLastSync > (isReturningFromComplete ? 0 : 2 * 60 * 1000); // 2 minutes, or immediately if returning from complete
+      
+      if (shouldSync && !syncMutation.isPending) {
+        console.log('[CompanyStripeManagement] Auto-syncing account status from Stripe', 
+          isReturningFromComplete ? '(returning from onboarding complete)' : '(account in onboarding state)');
+        setIsAutoSync(true); // Mark as auto-sync to suppress alerts
+        syncMutation.mutate(undefined, {
+          onSuccess: () => {
+            // Refetch status after sync
+            setTimeout(() => {
+              refetchStatus();
+            }, 500);
+          },
+          onError: (error) => {
+            console.error('[CompanyStripeManagement] Auto-sync failed:', error);
+            // Don't show alert for auto-sync failures, just log
+          }
+        });
+      }
+    }
+  }, [status, companyId, syncMutation, refetchStatus, location]);
 
   // Ensure we have a companyId - check after all hooks are called
   if (!companyId) {
@@ -461,39 +599,178 @@ const CompanyStripeManagement: React.FC = () => {
               {onboardingUrl && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm font-medium text-blue-900 mb-2">Onboarding URL:</p>
-                  <a
-                    href={onboardingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-                  >
-                    {onboardingUrl}
-                    <ExternalLink className="h-4 w-4 ml-2" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={onboardingUrl}
+                      readOnly
+                      className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-md bg-white text-gray-900 font-mono"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(onboardingUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                      title="Copy to clipboard"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                    <a
+                      href={onboardingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
                 </div>
               )}
             </div>
 
+            {/* Get Onboarding Link - Show when account exists but onboarding not completed */}
+            {(() => {
+              const hasAccount = !!(status?.stripeAccountId || status?.StripeAccountId || company?.stripeAccountId);
+              const onboardingNotCompleted = !(status?.onboardingCompleted || status?.OnboardingCompleted);
+              const shouldShow = hasAccount && onboardingNotCompleted;
+              console.log('[CompanyStripeManagement] Get Onboarding Link section - shouldShow:', shouldShow, 'hasAccount:', hasAccount, 'onboardingNotCompleted:', onboardingNotCompleted);
+              console.log('[CompanyStripeManagement] status:', status);
+              console.log('[CompanyStripeManagement] company:', company);
+              return shouldShow;
+            })() && (
+              <div className="border border-gray-200 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">2. Get Onboarding Link</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Get or refresh the Stripe onboarding link to complete account setup.
+                </p>
+                
+                {/* Always show the link field */}
+                <div className="mb-4 p-4 bg-green-50 rounded-lg">
+                  <p className="text-sm font-medium text-green-900 mb-2">Onboarding URL:</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={onboardingUrl || (company as any)?.stripeOnboardingLink || ''}
+                      readOnly
+                      placeholder="Click 'Get Onboarding Link' to generate the URL"
+                      className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-md bg-white text-gray-900 font-mono"
+                      onClick={(e) => {
+                        const input = e.target as HTMLInputElement;
+                        if (input.value) {
+                          input.select();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const urlToCopy = onboardingUrl || (company as any)?.stripeOnboardingLink || '';
+                        if (urlToCopy) {
+                          navigator.clipboard.writeText(urlToCopy);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }
+                      }}
+                      disabled={!onboardingUrl && !(company as any)?.stripeOnboardingLink}
+                      className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      title="Copy to clipboard"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                    <a
+                      href={onboardingUrl || (company as any)?.stripeOnboardingLink || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center ${!(onboardingUrl || (company as any)?.stripeOnboardingLink) ? 'pointer-events-none opacity-50' : ''}`}
+                      title="Open in new tab"
+                      onClick={(e) => {
+                        if (!onboardingUrl && !(company as any)?.stripeOnboardingLink) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('[CompanyStripeManagement] ====== BUTTON CLICKED ======');
+                    console.log('[CompanyStripeManagement] Button clicked! Calling mutate...');
+                    console.log('[CompanyStripeManagement] companyId:', companyId);
+                    console.log('[CompanyStripeManagement] mutation state:', {
+                      isPending: getOnboardingLinkMutation.isPending,
+                      isError: getOnboardingLinkMutation.isError,
+                      isSuccess: getOnboardingLinkMutation.isSuccess
+                    });
+                    try {
+                      getOnboardingLinkMutation.mutate(undefined, {
+                        onSuccess: (data) => {
+                          console.log('[CompanyStripeManagement] MUTATION SUCCESS - data:', data);
+                        },
+                        onError: (error) => {
+                          console.error('[CompanyStripeManagement] MUTATION ERROR:', error);
+                        }
+                      });
+                      console.log('[CompanyStripeManagement] mutate() called successfully');
+                    } catch (error) {
+                      console.error('[CompanyStripeManagement] Error calling mutate():', error);
+                    }
+                  }}
+                  disabled={getOnboardingLinkMutation.isPending}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {getOnboardingLinkMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Getting link...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Get Onboarding Link
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* Check Status */}
             <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-medium text-gray-900 mb-2">2. Check Status</h3>
+              <h3 className="font-medium text-gray-900 mb-2">{(status?.stripeAccountId || status?.StripeAccountId || company?.stripeAccountId) && !(status?.onboardingCompleted || status?.OnboardingCompleted) ? '3' : '2'}. Check Status</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Refresh the account status information from the database.
+                Sync the latest account status from Stripe API and update the database. Use this after completing onboarding or if the status seems outdated.
               </p>
               <button
-                onClick={() => refetchStatus()}
-                disabled={statusLoading}
+                onClick={() => {
+                  // Sync from Stripe first, then refetch
+                  syncMutation.mutate(undefined, {
+                    onSuccess: () => {
+                      // Refetch status after sync completes
+                      setTimeout(() => {
+                        refetchStatus();
+                      }, 500);
+                    }
+                  });
+                }}
+                disabled={statusLoading || syncMutation.isPending}
                 className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
-                {statusLoading ? (
+                {(statusLoading || syncMutation.isPending) ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Refreshing...
+                    Syncing from Stripe...
                   </>
                 ) : (
                   <>
                     <RotateCcw className="h-4 w-4 mr-2" />
-                    Refresh Status
+                    Sync Status from Stripe
                   </>
                 )}
               </button>
@@ -508,7 +785,11 @@ const CompanyStripeManagement: React.FC = () => {
                   Use this if the status seems outdated or after completing onboarding.
                 </p>
                 <button
-                  onClick={() => syncMutation.mutate()}
+                  onClick={() => {
+                    // Manual sync - show alerts
+                    setIsAutoSync(false);
+                    syncMutation.mutate();
+                  }}
                   disabled={syncMutation.isPending}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >

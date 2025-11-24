@@ -11,6 +11,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Settings from './pages/Settings';
 import StripeSettings from './pages/StripeSettings';
 import CompanyStripeManagement from './pages/CompanyStripeManagement';
+import StripeOnboardingComplete from './pages/StripeOnboardingComplete';
 import './App.css';
 
 // Create a QueryClient instance
@@ -67,6 +68,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CompanyStripeManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/companies/:companyId/stripe/complete"
+            element={
+              <ProtectedRoute>
+                <StripeOnboardingComplete />
               </ProtectedRoute>
             }
           />

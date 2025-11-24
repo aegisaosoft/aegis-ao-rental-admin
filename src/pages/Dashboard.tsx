@@ -13,13 +13,6 @@ const Dashboard = () => {
   const displayRole = roleLower ? roleLower : 'user';
   const canAccessSettings = roleLower === 'mainadmin' || roleLower === 'admin';
 
-  React.useEffect(() => {
-    console.groupCollapsed('[Dashboard] user snapshot');
-    console.info('[Dashboard]', 'raw user object:', user);
-    console.info('[Dashboard]', 'displayName:', displayName);
-    console.info('[Dashboard]', 'displayRole:', displayRole);
-    console.groupEnd();
-  }, [user, displayName, displayRole]);
   const navigate = useNavigate();
 
   if (!user) {
