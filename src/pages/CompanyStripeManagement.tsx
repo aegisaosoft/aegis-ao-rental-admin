@@ -255,8 +255,24 @@ const CompanyStripeManagement: React.FC = () => {
       const response = await api.post(`/companies/${companyId}/stripe/suspend`, { reason });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['stripeStatus', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company', companyId] });
+      const message = data?.message || 'Account suspended successfully';
+      alert(message);
+      // Sync status from Stripe after suspend to get latest state
+      setTimeout(() => {
+        syncMutation.mutate(undefined, {
+          onSuccess: () => {
+            refetchStatus();
+          }
+        });
+      }, 500);
+    },
+    onError: (error: any) => {
+      console.error('[CompanyStripeManagement] Suspend error:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to suspend account';
+      alert(`Error: ${errorMessage}`);
     },
   });
 
@@ -266,8 +282,24 @@ const CompanyStripeManagement: React.FC = () => {
       const response = await api.post(`/companies/${companyId}/stripe/reactivate`);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['stripeStatus', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company', companyId] });
+      const message = data?.message || 'Account reactivated successfully';
+      alert(message);
+      // Sync status from Stripe after reactivate to get latest state
+      setTimeout(() => {
+        syncMutation.mutate(undefined, {
+          onSuccess: () => {
+            refetchStatus();
+          }
+        });
+      }, 500);
+    },
+    onError: (error: any) => {
+      console.error('[CompanyStripeManagement] Reactivate error:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to reactivate account';
+      alert(`Error: ${errorMessage}`);
     },
   });
 
@@ -850,7 +882,7 @@ const CompanyStripeManagement: React.FC = () => {
             )}
 
             {/* Reactivate Account */}
-            {status && status.accountStatus && status.accountStatus !== 'not_started' && (
+            {status && (status.accountStatus || status.AccountStatus) && (status.accountStatus || status.AccountStatus || '').toLowerCase() !== 'not_started' && (
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="font-medium text-gray-900 mb-2">5. Reactivate Account</h3>
                 <p className="text-sm text-gray-600 mb-4">
