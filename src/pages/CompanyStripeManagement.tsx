@@ -88,7 +88,7 @@ const CompanyStripeManagement: React.FC = () => {
     queryKey: ['stripeStatus', companyId],
     queryFn: async () => {
       try {
-        const response = await api.get(`/companies/${companyId}/stripe/status`);
+        const response = await api.get(`/companies/${companyId}/stripe/status?source=admin`);
         
         // The API wraps responses in { result: data, reason: 0, message: null, stackTrace: null }
         // Unwrap it like other services do
@@ -157,7 +157,7 @@ const CompanyStripeManagement: React.FC = () => {
   // Setup Stripe account mutation
   const setupMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.post(`/companies/${companyId}/stripe/setup`);
+      const response = await api.post(`/companies/${companyId}/stripe/setup?source=admin`);
       return response.data;
     },
     onSuccess: (data) => {
@@ -178,7 +178,7 @@ const CompanyStripeManagement: React.FC = () => {
       console.log('[CompanyStripeManagement] companyId:', companyId);
       try {
         // Add json query parameter to get JSON response instead of redirect
-        const response = await api.get(`/companies/${companyId}/stripe/reauth?json=true`, {
+        const response = await api.get(`/companies/${companyId}/stripe/reauth?json=true&source=admin`, {
           headers: {
             'Accept': 'application/json'
           }
@@ -219,8 +219,8 @@ const CompanyStripeManagement: React.FC = () => {
       if (url) {
         console.log('[CompanyStripeManagement] Setting onboarding URL state:', url);
         setOnboardingUrl(url);
-        // Optionally open in new tab
-        window.open(url, '_blank');
+        // Redirect to Stripe onboarding in the same window
+        window.location.href = url;
       } else {
         console.warn('[CompanyStripeManagement] No URL found in response. Full data:', JSON.stringify(data, null, 2));
         alert('Warning: Onboarding link was received but could not be extracted. Check console for details.');
@@ -320,7 +320,7 @@ const CompanyStripeManagement: React.FC = () => {
   // Sync/Find account mutation
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.post(`/companies/${companyId}/stripe/sync`);
+      const response = await api.post(`/companies/${companyId}/stripe/sync?source=admin`);
       return response.data;
     },
     onSuccess: (data) => {
@@ -652,7 +652,6 @@ const CompanyStripeManagement: React.FC = () => {
                     </button>
                     <a
                       href={onboardingUrl}
-                      target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
                       title="Open in new tab"
@@ -714,7 +713,6 @@ const CompanyStripeManagement: React.FC = () => {
                     </button>
                     <a
                       href={onboardingUrl || (company as any)?.stripeOnboardingLink || '#'}
-                      target="_blank"
                       rel="noopener noreferrer"
                       className={`px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center ${!(onboardingUrl || (company as any)?.stripeOnboardingLink) ? 'pointer-events-none opacity-50' : ''}`}
                       title="Open in new tab"
