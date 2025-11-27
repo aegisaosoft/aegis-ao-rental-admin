@@ -1463,6 +1463,7 @@ const CompanyForm: React.FC = () => {
     isTestCompany: true
   });
   const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
+  const [originalSubdomain, setOriginalSubdomain] = useState<string | undefined>(undefined);
 
   const normalizedSubdomain =
     formData.subdomain && formData.subdomain.trim()
@@ -1753,6 +1754,12 @@ const CompanyForm: React.FC = () => {
         normalizedAbout = JSON.stringify([createEmptySection()], null, 2);
       }
  
+      // Store original subdomain to prevent changes
+      // Check both camelCase and PascalCase versions
+      const originalSubdomainValue = rest?.subdomain || (rest as any)?.Subdomain || undefined;
+      setOriginalSubdomain(originalSubdomainValue);
+      console.log('[CompanyForm] Loaded company - originalSubdomain:', originalSubdomainValue);
+
       setFormData(prev => ({
         ...prev,
         ...rest,
@@ -1788,22 +1795,40 @@ const CompanyForm: React.FC = () => {
     setError(null);
 
     try {
-      // Prepare data - convert empty strings to null for optional fields
-      const { motto, mottoDescription, invitation, ...baseFormData } = formData;
+      // For new companies (no id), subdomain is REQUIRED
+      if (!id) {
+        if (!normalizedSubdomain || normalizedSubdomain.trim() === '') {
+          setError('Subdomain is required when creating a new company');
+          setSaving(false);
+          return;
+        }
+      }
 
-      const submitData = {
+      // Prepare data - convert empty strings to null for optional fields
+      // Exclude subdomain from baseFormData if company already has one (to prevent updates)
+      const { motto, mottoDescription, invitation, subdomain: _, ...baseFormData } = formData;
+
+      // If company already has a subdomain, completely prohibit updating it
+      // Don't include subdomain in the update request at all
+      const submitData: any = {
         ...baseFormData,
         // Convert empty strings to null/undefined for optional fields
-        subdomain: normalizedSubdomain || undefined,
+        // For new companies: subdomain is required (already validated above)
+        // For existing companies: only include subdomain if company doesn't have one yet
+        // If company already has a subdomain, exclude it from the update request
+        ...(originalSubdomain ? {} : { subdomain: normalizedSubdomain || undefined }),
         logoUrl: formData.logoUrl && formData.logoUrl.trim() ? formData.logoUrl : undefined,
         faviconUrl: formData.faviconUrl && formData.faviconUrl.trim() ? formData.faviconUrl : undefined,
         country: formData.country && formData.country.trim() ? formData.country : undefined,
         currency: formData.currency && formData.currency.trim() ? formData.currency.trim().toUpperCase() : undefined,
         language: formData.language && formData.language.trim() ? formData.language : undefined,
         about: formData.about && formData.about.trim() ? formData.about : undefined,
-        website: websiteDisplay ? websiteDisplay : undefined,
+        // Only set website from subdomain if company doesn't have a subdomain yet
+        // If company already has a subdomain, don't update website from subdomain
+        website: originalSubdomain ? (formData.website && formData.website.trim() ? formData.website : undefined) : (websiteDisplay ? websiteDisplay : undefined),
         customCss: formData.customCss && formData.customCss.trim() ? formData.customCss : undefined,
         videoLink: formData.videoLink && formData.videoLink.trim() ? formData.videoLink : undefined,
+        // Don't truncate data URLs - backend's NormalizeAndSaveAssetAsync will convert them to file URLs
         bannerLink: formData.bannerLink && formData.bannerLink.trim() ? formData.bannerLink : undefined,
         backgroundLink: formData.backgroundLink && formData.backgroundLink.trim() ? formData.backgroundLink : undefined,
         stripeAccountId: removeStripeAccount
@@ -1820,13 +1845,26 @@ const CompanyForm: React.FC = () => {
         texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
 
+      // CRITICAL: If company already has a subdomain, explicitly delete it from submitData
+      // This ensures it's never sent in the update request
+      // Forcefully remove subdomain in all possible forms (camelCase, PascalCase, etc.)
+      if (id && originalSubdomain) {
+        delete (submitData as any).subdomain;
+        delete (submitData as any).Subdomain;
+        delete (submitData as any).SUBDOMAIN;
+        
+        console.log('[CompanyForm] ✓ Removed subdomain from submitData. originalSubdomain:', originalSubdomain);
+      }
+
       console.log('[CompanyForm] Submitting data:', {
         id,
-        dataKeys: Object.keys(submitData),
-        securityDeposit: submitData.securityDeposit,
-        currency: submitData.currency,
-        textsLength: submitData.texts?.length || 0,
-        fullData: submitData
+        originalSubdomain,
+        isUpdate: !!id,
+        hasSubdomainInSubmitData: 'subdomain' in submitData,
+        hasSubdomainPascalCase: 'Subdomain' in submitData,
+        subdomainValue: (submitData as any).subdomain || (submitData as any).Subdomain,
+        dataKeys: Object.keys(submitData).sort(),
+        subdomainInKeys: Object.keys(submitData).includes('subdomain') || Object.keys(submitData).includes('Subdomain')
       });
 
       if (id) {
@@ -2107,26 +2145,55 @@ const CompanyForm: React.FC = () => {
 
               <div>
                 <label htmlFor="subdomain" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subdomain <span className="text-gray-500 text-xs">(Optional - can be set manually)</span>
+                  Subdomain {!id && <span className="text-red-500">*</span>}
+                  {id && <span className="text-gray-500 text-xs">(Cannot be changed once set)</span>}
                 </label>
-                <div className="flex items-center">
-                <input
-                  type="text"
-                  id="subdomain"
-                  name="subdomain"
-                  value={formData.subdomain || ''}
-                  onChange={handleChange}
-                  pattern="[a-z0-9\-]+"
-                  placeholder="company"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
-                />
-                  <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-700">
-                    .aegis-rental.com
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  Lowercase letters, numbers, and hyphens only. Leave empty to set later.
-                </p>
+                {originalSubdomain ? (
+                  <div>
+                    <div className="flex items-center">
+                      <input
+                        type="text"
+                        id="subdomain"
+                        value={originalSubdomain}
+                        readOnly
+                        disabled
+                        className="w-full px-4 py-2 border border-gray-300 rounded-l-md bg-gray-100 cursor-not-allowed"
+                      />
+                      <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-700">
+                        .aegis-rental.com
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-amber-600">
+                      Subdomain cannot be changed once set
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Used for: {originalSubdomain}.aegis-rental.com
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center">
+                      <input
+                        type="text"
+                        id="subdomain"
+                        name="subdomain"
+                        value={formData.subdomain || ''}
+                        onChange={handleChange}
+                        pattern="[a-z0-9\-]+"
+                        placeholder="company"
+                        required={!id}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <span className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-700">
+                        .aegis-rental.com
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Lowercase letters, numbers, and hyphens only.
+                      {!id && <span className="text-red-600"> Required for new companies.</span>}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="md:col-span-2">
