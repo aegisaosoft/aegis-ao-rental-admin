@@ -1499,6 +1499,28 @@ const CompanyForm: React.FC = () => {
         return;
       }
 
+      // Check file type - only allow JPG and PNG
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      const fileType = file.type.toLowerCase();
+      if (!allowedTypes.includes(fileType)) {
+        const fileName = file.name;
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        alert(`Invalid image type. Only JPG and PNG images are allowed. Selected file: ${fileName} (${fileExtension || 'unknown type'})`);
+        cleanup();
+        return;
+      }
+
+      // Check file size before processing
+      // Limit to 2MB original file size (becomes ~2.67MB in base64)
+      const maxSizeBytes = 2 * 1024 * 1024; // 2MB
+      if (file.size > maxSizeBytes) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        const maxSizeMB = (maxSizeBytes / (1024 * 1024)).toFixed(0);
+        alert(`Image is too large (${fileSizeMB}MB). Maximum allowed size is ${maxSizeMB}MB. Please compress the image or choose a smaller file.`);
+        cleanup();
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
@@ -1508,6 +1530,7 @@ const CompanyForm: React.FC = () => {
       };
       reader.onerror = () => {
         console.error('Failed to read selected file');
+        alert('Failed to read the selected file. Please try again.');
         cleanup();
       };
       reader.readAsDataURL(file);
@@ -1518,7 +1541,9 @@ const CompanyForm: React.FC = () => {
   }, []);
 
   const handleMediaUpload = useCallback((field: MediaFieldKey, accept: string) => {
-    triggerFilePicker(accept, (dataUrl) => {
+    // For image uploads, restrict to JPG and PNG only
+    const imageAccept = accept === 'image/*' ? 'image/jpeg,image/jpg,image/png' : accept;
+    triggerFilePicker(imageAccept, (dataUrl) => {
       setFormData(prev => ({
         ...prev,
         [field]: dataUrl

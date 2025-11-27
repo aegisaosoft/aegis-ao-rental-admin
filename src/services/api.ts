@@ -20,10 +20,28 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    // Log DELETE requests for debugging
-    if (config.method === 'delete') {
+    // Log all PUT/POST requests for debugging
+    if (config.method === 'put' || config.method === 'post' || config.method === 'delete') {
       const fullUrl = (config.baseURL || '') + (config.url || '');
-      console.log('[api] DELETE request:', config.url, 'Full URL:', fullUrl);
+      console.log(`[api] ${config.method?.toUpperCase()} request:`, config.url, 'Full URL:', fullUrl);
+      if (config.method === 'put' && config.data) {
+        const dataKeys = Object.keys(config.data);
+        const hasImageData = dataKeys.some(key => 
+          ['bannerLink', 'backgroundLink', 'logoUrl', 'faviconUrl'].includes(key) && 
+          typeof config.data[key] === 'string' && 
+          config.data[key].startsWith('data:')
+        );
+        console.log(`[api] PUT data keys:`, dataKeys);
+        console.log(`[api] PUT has image data:`, hasImageData);
+        if (hasImageData) {
+          console.log(`[api] PUT image field lengths:`, {
+            bannerLink: config.data.bannerLink?.length || 0,
+            backgroundLink: config.data.backgroundLink?.length || 0,
+            logoUrl: config.data.logoUrl?.length || 0,
+            faviconUrl: config.data.faviconUrl?.length || 0,
+          });
+        }
+      }
     }
     return config;
   },
