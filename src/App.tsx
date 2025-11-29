@@ -12,6 +12,8 @@ import Settings from './pages/Settings';
 import StripeSettings from './pages/StripeSettings';
 import CompanyStripeManagement from './pages/CompanyStripeManagement';
 import StripeOnboardingComplete from './pages/StripeOnboardingComplete';
+import SetNewClient from './pages/SetNewClient';
+import DesignerRoute from './components/DesignerRoute';
 import './App.css';
 
 // Create a QueryClient instance
@@ -36,7 +38,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
     );
   }
 
-  return user ? children : <Navigate to="/login" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // For designer role, wrap with DesignerRoute to handle company redirect
+  const roleLower = ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase();
+  if (roleLower === 'designer') {
+    return <DesignerRoute>{children}</DesignerRoute>;
+  }
+
+  return children;
 };
 
 function App() {
@@ -47,6 +59,7 @@ function App() {
           <ScrollToTop />
           <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/set-new-client" element={<SetNewClient />} />
           <Route
             path="/dashboard"
             element={
@@ -119,7 +132,14 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <Navigate to="/dashboard" replace />
+              </ProtectedRoute>
+            } 
+          />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

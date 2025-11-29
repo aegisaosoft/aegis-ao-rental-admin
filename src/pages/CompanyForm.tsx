@@ -8,6 +8,7 @@ import { translationService } from '../services/translationService';
 import { SUPPORTED_LANGUAGES } from '../types/translation.types';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 // Country options grouped by continent
 const countriesByContinent = {
@@ -1426,6 +1427,12 @@ const ReservationsTab: React.FC<ReservationsTabProps> = ({ companyId }) => {
 const CompanyForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Check if user is a designer
+  const roleLower = user ? ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase() : '';
+  const isDesigner = roleLower === 'designer';
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1811,8 +1818,18 @@ const CompanyForm: React.FC = () => {
   useEffect(() => {
     if (id) {
       loadCompany();
+    } else {
+      // For new companies, set email from user's userId (email) ONLY if designer
+      const roleLower = user ? ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase() : '';
+      if (roleLower === 'designer') {
+        const userEmail = user?.userId || user?.UserId || '';
+        if (userEmail && !formData.email) {
+          setFormData(prev => ({ ...prev, email: userEmail }));
+        }
+      }
+      // For other roles, don't auto-populate email - let them enter it manually
     }
-  }, [id, loadCompany]);
+  }, [id, loadCompany, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1918,6 +1935,14 @@ const CompanyForm: React.FC = () => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
 
+    // Prevent email changes for designers
+    if (name === 'email') {
+      const roleLower = user ? ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase() : '';
+      if (roleLower === 'designer') {
+        return; // Don't allow email changes for designers
+      }
+    }
+
     if (name === 'currency') {
       const nextCurrency = value.toUpperCase();
       setFormData(prev => ({
@@ -2001,14 +2026,16 @@ const CompanyForm: React.FC = () => {
               </h1>
             </div>
           </div>
-          <button 
-            type="button" 
-            onClick={() => navigate('/companies')}
-            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back to List
-          </button>
+          {!isDesigner && (
+            <button 
+              type="button" 
+              onClick={() => navigate('/companies')}
+              className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Back to List
+            </button>
+          )}
         </div>
 
         {error && (
@@ -2164,7 +2191,11 @@ const CompanyForm: React.FC = () => {
                   onChange={handleChange}
                   required
                   placeholder="contact@company.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  disabled={(() => {
+                    const roleLower = user ? ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase() : '';
+                    return roleLower === 'designer';
+                  })()}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 />
               </div>
 
@@ -2830,16 +2861,6 @@ const CompanyForm: React.FC = () => {
           <section className="space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <h2 className="text-2xl font-bold text-gray-900">Business Information</h2>
-              {id && (
-                <button
-                  onClick={() => navigate(`/companies/${id}/stripe`)}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  <span>Manage Stripe Account</span>
-                  <ExternalLink className="h-4 w-4" />
-                </button>
-              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

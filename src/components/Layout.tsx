@@ -33,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const displayName = `${firstName || userId || 'User'}${lastName ? ` ${lastName}` : ''}`.trim();
   const displayRole = roleLower || 'user';
   const canAccessSettings = roleLower === 'mainadmin' || roleLower === 'admin';
+  const isDesigner = roleLower === 'designer';
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -50,53 +51,57 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Navigation Links and User Info */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                pathname === '/dashboard' 
-                  ? 'bg-blue-700 text-white' 
-                  : 'text-blue-100 hover:bg-blue-700 hover:text-white'
-              }`}
-            >
-              <Home className="h-4 w-4" />
-              <span className="text-sm font-medium">Home</span>
-            </button>
-            <button
-              onClick={() => navigate('/companies')}
-              className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                pathname.startsWith('/companies') 
-                  ? 'bg-blue-700 text-white' 
-                  : 'text-blue-100 hover:bg-blue-700 hover:text-white'
-              }`}
-            >
-              <Building2 className="h-4 w-4" />
-              <span className="text-sm font-medium">Companies</span>
-            </button>
-            {canAccessSettings && (
-              <button
-                onClick={() => navigate('/settings')}
-                className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                  pathname.startsWith('/settings') && !pathname.startsWith('/stripe-settings')
-                    ? 'bg-blue-700 text-white'
-                    : 'text-blue-100 hover:bg-blue-700 hover:text-white'
-                }`}
-              >
-                <SettingsIcon className="h-4 w-4" />
-                <span className="text-sm font-medium">Settings</span>
-              </button>
-            )}
-            {canAccessSettings && (
-              <button
-                onClick={() => navigate('/stripe-settings')}
-                className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                  pathname.startsWith('/stripe-settings')
-                    ? 'bg-blue-700 text-white'
-                    : 'text-blue-100 hover:bg-blue-700 hover:text-white'
-                }`}
-              >
-                <CreditCard className="h-4 w-4" />
-                <span className="text-sm font-medium">Stripe Settings</span>
-              </button>
+            {!isDesigner && (
+              <>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                    pathname === '/dashboard' 
+                      ? 'bg-blue-700 text-white' 
+                      : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                  }`}
+                >
+                  <Home className="h-4 w-4" />
+                  <span className="text-sm font-medium">Home</span>
+                </button>
+                <button
+                  onClick={() => navigate('/companies')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                    pathname.startsWith('/companies') 
+                      ? 'bg-blue-700 text-white' 
+                      : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                  }`}
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span className="text-sm font-medium">Companies</span>
+                </button>
+                {canAccessSettings && (
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                      pathname.startsWith('/settings') && !pathname.startsWith('/stripe-settings')
+                        ? 'bg-blue-700 text-white'
+                        : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                    }`}
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    <span className="text-sm font-medium">Settings</span>
+                  </button>
+                )}
+                {canAccessSettings && (
+                  <button
+                    onClick={() => navigate('/stripe-settings')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                      pathname.startsWith('/stripe-settings')
+                        ? 'bg-blue-700 text-white'
+                        : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span className="text-sm font-medium">Stripe Settings</span>
+                  </button>
+                )}
+              </>
             )}
 
             {/* User Info and Logout */}

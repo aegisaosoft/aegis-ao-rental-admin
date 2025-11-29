@@ -150,12 +150,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem('aegisUser', JSON.stringify(normalized));
           } else {
             console.warn('[AuthContext] Profile response did not include user payload', payload);
-            // Invalid session - clear and redirect
+            // Invalid session - clear and redirect (unless on set-new-client page)
             localStorage.removeItem('token');
             localStorage.removeItem('aegisUser');
             setToken(null);
             setUser(null);
-            window.location.href = '/login';
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/set-new-client') {
+              window.location.href = '/login';
+            }
             return;
           }
         } catch (error: any) {
@@ -165,14 +168,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem('aegisUser');
           setToken(null);
           setUser(null);
-          // Only redirect if we're not already on login page
-          if (window.location.pathname !== '/login') {
+          // Only redirect if we're not already on login or set-new-client page
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login' && currentPath !== '/set-new-client') {
             window.location.href = '/login';
           }
         }
       } else {
-        // No token - redirect to login if not already there
-        if (window.location.pathname !== '/login') {
+        // No token - redirect to login if not already on login or set-new-client page
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login' && currentPath !== '/set-new-client') {
           window.location.href = '/login';
         }
       }
