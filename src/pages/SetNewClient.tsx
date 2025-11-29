@@ -29,7 +29,6 @@ const SetNewClient: React.FC = () => {
     language: 'en',
   });
   const [apiMessages, setApiMessages] = useState<string[]>([]);
-  const hasAttemptedSetup = useRef(false);
 
   const decodedEmail = email ? decodeURIComponent(email) : '';
   const decodedPassword = password ? decodeURIComponent(password) : '';
@@ -160,10 +159,8 @@ const SetNewClient: React.FC = () => {
           // Error messages should already be in apiMessages from the API response
         }
         
-        // Always set email from URL params when component mounts or email changes
-        if (decodedEmail && !companyFormData.email) {
-          setCompanyFormData(prev => ({ ...prev, email: decodedEmail }));
-        } else {
+        // Log authentication status if conditions not met
+        if (!isAuthenticated || !hasToken) {
           console.log('⚠ Authentication conditions not met:', {
             authenticated: isAuthenticated,
             hasToken: hasToken,
@@ -185,6 +182,7 @@ const SetNewClient: React.FC = () => {
     };
 
     checkEmailAndSetup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decodedEmail, decodedPassword, login]);
 
 
