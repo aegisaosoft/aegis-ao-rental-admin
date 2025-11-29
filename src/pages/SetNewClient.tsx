@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Building2, Loader2, CheckCircle, XCircle, Save } from 'lucide-react';
+import { toast } from 'react-toastify';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -76,9 +77,26 @@ const SetNewClient: React.FC = () => {
         const data = response.data?.result || response.data;
         console.log('Full API Response:', data);
         
-        // Store API messages
+        // Store API messages and show toast notifications
         if (data.messages && Array.isArray(data.messages)) {
           setApiMessages(data.messages);
+          // Show toast notifications for messages
+          data.messages.forEach((message: string) => {
+            if (message.startsWith('Error') || 
+                message.includes('Invalid password') || 
+                message.includes('contact support') ||
+                message.includes('This email is registered to')) {
+              toast.error(message, { position: 'top-center' });
+            } else if (message === 'Email Available' || message === 'This email is available for registration.') {
+              toast.success(message, { position: 'top-center' });
+            } else if (message === 'No Company Found' || message === 'No company exists with this email address.') {
+              toast.info(message, { position: 'top-center' });
+            } else if (message.includes('Use this email') || 
+                       message.includes('designer') || 
+                       message.includes('After creation')) {
+              toast.info(message, { position: 'top-center' });
+            }
+          });
         } else {
           setApiMessages([]);
         }
@@ -114,6 +132,9 @@ const SetNewClient: React.FC = () => {
           console.log('✓ All conditions met - proceeding with authentication and redirect');
           setAegisUserCreated(true);
           
+          // Show success toast
+          toast.success('Authentication successful! Redirecting...', { position: 'top-center' });
+          
           // Store token and user info immediately
           localStorage.setItem('token', data.token);
           console.log('✓ Token stored in localStorage');
@@ -140,7 +161,7 @@ const SetNewClient: React.FC = () => {
           // Use setTimeout to ensure state updates complete before redirect
           setTimeout(() => {
             window.location.href = redirectPath;
-          }, 50);
+          }, 1000); // Give time for toast to show
         } else if (isEmailAvailable && !isAuthenticated) {
           console.log('⚠ Email available but not authenticated - showing form');
           // Email available but authentication failed - show form but user needs to login manually
@@ -167,6 +188,8 @@ const SetNewClient: React.FC = () => {
         // Don't log 404s as errors - they're expected
         if (err.response?.status !== 404) {
           console.error('Error checking email and setup:', err);
+          const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to process request';
+          toast.error(errorMessage, { position: 'top-center' });
         }
       } finally {
         setCheckingCustomer(false);

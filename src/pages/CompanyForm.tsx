@@ -1822,7 +1822,7 @@ const CompanyForm: React.FC = () => {
       // For new companies, set email from user's userId (email) ONLY if designer
       const roleLower = user ? ((user as any)?.role ?? (user as any)?.Role ?? '').toString().trim().toLowerCase() : '';
       if (roleLower === 'designer') {
-        const userEmail = user?.userId || user?.UserId || '';
+        const userEmail = user?.userId || '';
         if (userEmail && !formData.email) {
           setFormData(prev => ({ ...prev, email: userEmail }));
         }

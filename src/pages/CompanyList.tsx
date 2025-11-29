@@ -10,9 +10,11 @@ import {
   ColumnDef,
   SortingState,
 } from '@tanstack/react-table';
+import { toast } from 'react-toastify';
 import companyService, { Company } from '../services/companyService';
 import { Building2, Plus, Trash2, Edit, ChevronLeft, ChevronRight, CreditCard } from 'lucide-react';
 import Layout from '../components/Layout';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const CompanyList: React.FC = () => {
   const navigate = useNavigate();
@@ -21,6 +23,11 @@ const CompanyList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string; name: string }>({
+    isOpen: false,
+    id: '',
+    name: '',
+  });
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -40,19 +47,26 @@ const CompanyList: React.FC = () => {
     loadCompanies();
   }, [loadCompanies]);
 
-  const handleDelete = useCallback(async (id: string, companyName: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${companyName}?`)) {
-      return;
-    }
+  const handleDeleteClick = useCallback((id: string, companyName: string) => {
+    setDeleteConfirm({ isOpen: true, id, name: companyName });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const { id, name } = deleteConfirm;
+    setDeleteConfirm({ isOpen: false, id: '', name: '' });
 
     try {
       await companyService.deleteCompany(id);
-      alert('Company deleted successfully');
+      toast.success(`Company "${name}" deleted successfully`, { position: 'top-center' });
       loadCompanies();
     } catch (err: any) {
-      alert('Failed to delete company: ' + err.message);
+      toast.error(`Failed to delete company: ${err.message}`, { position: 'top-center' });
     }
-  }, [loadCompanies]);
+  }, [deleteConfirm, loadCompanies]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteConfirm({ isOpen: false, id: '', name: '' });
+  }, []);
 
   const columns = useMemo<ColumnDef<Company>[]>(
     () => [
@@ -78,7 +92,7 @@ const CompanyList: React.FC = () => {
                 <CreditCard className="h-5 w-5" />
               </button>
               <button
-                onClick={() => handleDelete(company.id, company.companyName)}
+                onClick={() => handleDeleteClick(company.id, company.companyName)}
                 className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded"
                 title="Delete"
               >
@@ -190,7 +204,7 @@ const CompanyList: React.FC = () => {
         ),
       },
     ],
-    [navigate, handleDelete]
+    [navigate, handleDeleteClick]
   );
 
   const table = useReactTable({
@@ -237,8 +251,19 @@ const CompanyList: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Company"
+        message={`Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone and will delete all associated data.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        type="danger"
+      />
+      <Layout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
@@ -414,7 +439,8 @@ const CompanyList: React.FC = () => {
           </div>
         )}
       </div>
-    </Layout>
+      </Layout>
+    </>
   );
 };
 
