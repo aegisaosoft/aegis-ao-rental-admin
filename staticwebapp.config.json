@@ -1,13 +1,44 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "*.{css,scss,js,png,gif,ico,jpg,svg,woff,woff2,ttf,eot,json}"]
+    "exclude": [
+      "/api/*",
+      "/static/**",
+      "/static/*",
+      "/*.{css,scss,js,js.map,css.map,png,gif,ico,jpg,jpeg,svg,webp,woff,woff2,ttf,eot,json,json.map,LICENSE.txt}"
+    ]
   },
   "routes": [
     {
-      "route": "/*",
+      "route": "/static/**",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/static/css/**",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-type": "text/css"
+      }
+    },
+    {
+      "route": "/static/js/**",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-type": "application/javascript"
+      }
+    },
+    {
+      "route": "/*.{css,js}",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "route": "/*",
+      "headers": {
+        "cache-control": "no-cache"
       }
     }
   ],
@@ -19,8 +50,20 @@
   },
   "mimeTypes": {
     ".json": "application/json",
+    ".js": "application/javascript",
+    ".js.map": "application/json",
+    ".css": "text/css",
+    ".css.map": "application/json",
     ".woff": "application/font-woff",
-    ".woff2": "application/font-woff2"
+    ".woff2": "application/font-woff2",
+    ".ttf": "application/font-ttf",
+    ".eot": "application/vnd.ms-fontobject",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".webp": "image/webp"
   }
 }
-

@@ -1,0 +1,42 @@
+# Apache configuration for React app on Linux server
+# Serve static files with correct MIME types
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Serve static files directly (don't rewrite to index.html)
+  RewriteCond %{REQUEST_URI} ^/static/.*$ [OR]
+  RewriteCond %{REQUEST_URI} \.(css|js|js\.map|css\.map|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json)$ [NC]
+  RewriteRule ^ - [L]
+  
+  # All other requests go to index.html for client-side routing
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Set correct MIME types
+<IfModule mod_mime.c>
+  AddType application/javascript js
+  AddType application/json json js.map css.map
+  AddType text/css css
+  AddType application/font-woff woff
+  AddType application/font-woff2 woff2
+  AddType application/font-ttf ttf
+  AddType application/vnd.ms-fontobject eot
+  AddType image/svg+xml svg
+</IfModule>
+
+# Cache static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType application/font-woff "access plus 1 year"
+  ExpiresByType application/font-woff2 "access plus 1 year"
+</IfModule>
+
