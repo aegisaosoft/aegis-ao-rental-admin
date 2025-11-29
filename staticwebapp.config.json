@@ -3,27 +3,26 @@
     "rewrite": "/index.html",
     "exclude": [
       "/api/*",
-      "/static/**",
       "/static/*",
       "/*.{css,scss,js,js.map,css.map,png,gif,ico,jpg,jpeg,svg,webp,woff,woff2,ttf,eot,json,json.map,LICENSE.txt}"
     ]
   },
   "routes": [
     {
-      "route": "/static/**",
+      "route": "/static/*",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
     },
     {
-      "route": "/static/css/**",
+      "route": "/static/css/*",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable",
         "content-type": "text/css"
       }
     },
     {
-      "route": "/static/js/**",
+      "route": "/static/js/*",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable",
         "content-type": "application/javascript"
