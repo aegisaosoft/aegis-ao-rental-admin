@@ -1912,12 +1912,22 @@ const CompanyForm: React.FC = () => {
       if (id) {
         await companyService.updateCompany(id, submitData);
         alert('Company updated successfully!');
+        // If user is designer, stay on edit page; otherwise redirect to companies list
+        if (!isDesigner) {
+          navigate('/companies');
+        }
       } else {
-        await companyService.createCompany(submitData);
+        const newCompany = await companyService.createCompany(submitData);
         // Domain setup runs in background - all steps are automated
         alert('Company created successfully!\n\n✅ Domain setup is running automatically in the background:\n• DNS CNAME record creation\n• App Service custom domain binding\n• SSL certificate configuration\n\nThis may take 2-5 minutes to complete. You can check the status in Azure Portal.');
+        
+        // If user is designer, redirect to edit page; otherwise redirect to companies list
+        if (isDesigner && newCompany?.id) {
+          navigate(`/companies/${newCompany.id}`);
+        } else {
+          navigate('/companies');
+        }
       }
-      navigate('/companies');
     } catch (err: any) {
       console.error('Failed to save company:', err);
       console.error('Error response:', err.response?.data);
