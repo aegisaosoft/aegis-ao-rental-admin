@@ -3,14 +3,14 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net/api';
+
 const DesignerRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const hasCheckedRef = useRef(false);
-
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net/api';
 
   // Allowed paths for designers (only company creation/edit and set-new-client)
   const isCompanyPage = location.pathname.startsWith('/companies/');

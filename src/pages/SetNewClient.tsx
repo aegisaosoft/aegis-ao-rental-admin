@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Building2, Loader2, CheckCircle, XCircle, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -15,12 +15,8 @@ const SetNewClient: React.FC = () => {
   const email = searchParams.get('username') || '';
   const password = searchParams.get('password') || '';
   const [checkingCompany, setCheckingCompany] = useState(false);
-  const [companyExists, setCompanyExists] = useState<boolean | null>(null);
-  const [companyData, setCompanyData] = useState<any>(null);
   const [checkingCustomer, setCheckingCustomer] = useState(false);
-  const [customerData, setCustomerData] = useState<any>(null);
   const [customerCompanyName, setCustomerCompanyName] = useState<string | null>(null);
-  const [creatingAegisUser, setCreatingAegisUser] = useState(false);
   const [aegisUserCreated, setAegisUserCreated] = useState(false);
   const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
@@ -33,17 +29,17 @@ const SetNewClient: React.FC = () => {
     language: 'en',
   });
   const [apiMessages, setApiMessages] = useState<string[]>([]);
-  const hasAttemptedCreation = React.useRef(false);
+  const hasAttemptedSetup = useRef(false);
 
   const decodedEmail = email ? decodeURIComponent(email) : '';
   const decodedPassword = password ? decodeURIComponent(password) : '';
 
   // Update company form email when decodedEmail is available
   useEffect(() => {
-    if (decodedEmail) {
+    if (decodedEmail && !companyFormData.email) {
       setCompanyFormData(prev => ({ ...prev, email: decodedEmail }));
     }
-  }, [decodedEmail]);
+  }, [decodedEmail, companyFormData.email]);
 
   // Ensure email is set when form is shown
   useEffect(() => {
@@ -104,15 +100,6 @@ const SetNewClient: React.FC = () => {
         // Set customer data based on response
         if (data.hasCustomerWithCompany) {
           setCustomerCompanyName(data.customerCompanyName || 'Unknown Company');
-          setCustomerData({ companyId: true }); // Mark that customer has company
-        } else {
-          setCustomerData(null); // No customer or customer without company
-        }
-
-        // Set company existence
-        setCompanyExists(data.companyExists || false);
-        if (data.companyExists) {
-          setCompanyData({ companyName: data.companyName });
         }
 
         // If authentication was successful (token provided), automatically authenticate and redirect
@@ -329,15 +316,13 @@ const SetNewClient: React.FC = () => {
               )}
 
               {/* Loading States */}
-              {(checkingCompany || checkingCustomer || creatingAegisUser) && (
+              {(checkingCompany || checkingCustomer) && (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 text-blue-600 animate-spin mr-2" />
                   <p className="text-sm text-gray-600">
-                    {creatingAegisUser 
-                      ? 'Creating Aegis user and logging in...' 
-                      : checkingCustomer 
-                        ? 'Checking customer...' 
-                        : 'Checking company...'}
+                    {checkingCustomer 
+                      ? 'Checking customer...' 
+                      : 'Checking company...'}
                   </p>
                 </div>
               )}

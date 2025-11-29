@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import companyService from '../services/companyService';
 import { Company } from '../services/companyService';
-import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown, Calendar, CreditCard, ExternalLink } from 'lucide-react';
+import { Building2, ArrowLeft, Save, X, Sparkles, Zap, Crown, Calendar } from 'lucide-react';
 import Layout from '../components/Layout';
 import { translationService } from '../services/translationService';
 import { SUPPORTED_LANGUAGES } from '../types/translation.types';
@@ -1829,7 +1829,7 @@ const CompanyForm: React.FC = () => {
       }
       // For other roles, don't auto-populate email - let them enter it manually
     }
-  }, [id, loadCompany, user]);
+  }, [id, loadCompany, user, formData.email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
