@@ -9,12 +9,6 @@
   },
   "routes": [
     {
-      "route": "/static/*",
-      "headers": {
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
       "route": "/static/css/*",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable",
