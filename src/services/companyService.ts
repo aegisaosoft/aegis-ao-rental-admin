@@ -35,6 +35,8 @@ interface Company {
   texts?: string; // JSONB field - array of language objects with title and description
   isActive: boolean;
   isTestCompany?: boolean;
+  isRental?: boolean;
+  isViolations?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

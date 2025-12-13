@@ -9,6 +9,7 @@ import { SUPPORTED_LANGUAGES } from '../types/translation.types';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 // Country options grouped by continent
 const countriesByContinent = {
@@ -1467,7 +1468,9 @@ const CompanyForm: React.FC = () => {
     isSecurityDepositMandatory: true,
     texts: undefined,
     isActive: true,
-    isTestCompany: true
+    isTestCompany: true,
+    isRental: true,
+    isViolations: true
   });
   const [removeStripeAccount, setRemoveStripeAccount] = useState(false);
   const [originalSubdomain, setOriginalSubdomain] = useState<string | undefined>(undefined);
@@ -1805,7 +1808,10 @@ const CompanyForm: React.FC = () => {
         // Convert bookingIntegrated from string to boolean
         bookingIntegrated: rest.bookingIntegrated === 'true' || rest.bookingIntegrated === true,
         // Ensure isTestCompany is loaded correctly (handle both camelCase and PascalCase)
-        isTestCompany: (rest as any).isTestCompany ?? (rest as any).IsTestCompany ?? true
+        isTestCompany: (rest as any).isTestCompany ?? (rest as any).IsTestCompany ?? true,
+        // Load isRental and isViolations from CompanyMode
+        isRental: (rest as any).isRental ?? (rest as any).IsRental ?? true,
+        isViolations: (rest as any).isViolations ?? (rest as any).IsViolations ?? true
       }));
     } catch (err: any) {
       console.error('Failed to load company:', err);
@@ -1884,6 +1890,8 @@ const CompanyForm: React.FC = () => {
         securityDeposit: formData.securityDeposit !== undefined ? formData.securityDeposit : 1000,
         isSecurityDepositMandatory: formData.isSecurityDepositMandatory !== undefined ? formData.isSecurityDepositMandatory : true,
         isTestCompany: formData.isTestCompany !== undefined ? formData.isTestCompany : true,
+        isRental: formData.isRental !== undefined ? formData.isRental : true,
+        isViolations: formData.isViolations !== undefined ? formData.isViolations : true,
         texts: formData.texts && formData.texts.trim() ? formData.texts : undefined,
       };
 
@@ -1910,16 +1918,22 @@ const CompanyForm: React.FC = () => {
       });
 
       if (id) {
+        const isSettingSubdomainForFirstTime = !originalSubdomain && normalizedSubdomain && normalizedSubdomain.trim() !== '';
         await companyService.updateCompany(id, submitData);
-        alert('Company updated successfully!');
+        
+        if (isSettingSubdomainForFirstTime) {
+          toast.success('Company updated successfully! Domain setup is running automatically in the background (DNS, App Service binding, SSL). This may take 2-5 minutes.', { position: 'top-center', autoClose: 8000 });
+        } else {
+          toast.success('Company updated successfully!', { position: 'top-center' });
+        }
+        
         // If user is designer, stay on edit page; otherwise redirect to companies list
         if (!isDesigner) {
           navigate('/companies');
         }
       } else {
         const newCompany = await companyService.createCompany(submitData);
-        // Domain setup runs in background - all steps are automated
-        alert('Company created successfully!\n\n✅ Domain setup is running automatically in the background:\n• DNS CNAME record creation\n• App Service custom domain binding\n• SSL certificate configuration\n\nThis may take 2-5 minutes to complete. You can check the status in Azure Portal.');
+        toast.success('Company created successfully! Domain setup is running automatically in the background (DNS, App Service binding, SSL). This may take 2-5 minutes.', { position: 'top-center', autoClose: 8000 });
         
         // If user is designer, redirect to edit page; otherwise redirect to companies list
         if (isDesigner && newCompany?.id) {
@@ -2155,21 +2169,49 @@ const CompanyForm: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="isTestCompany"
-                    name="isTestCompany"
-                    checked={formData.isTestCompany ?? true}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="block text-sm font-medium text-gray-700">
-                    Test Company
-                  </span>
-                </label>
-                <p className="text-xs text-gray-500 mt-1 ml-6">
-                  Mark this company as a test company
+                <div className="flex flex-wrap items-start gap-6 pb-2">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="isTestCompany"
+                      name="isTestCompany"
+                      checked={formData.isTestCompany ?? true}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Test Company
+                    </span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="isRental"
+                      name="isRental"
+                      checked={(formData as any).isRental ?? true}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Is Rental
+                    </span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="isViolations"
+                      name="isViolations"
+                      checked={(formData as any).isViolations ?? true}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Is Violations
+                    </span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Mark this company as a test company, rental, or violations company
                 </p>
               </div>
 
@@ -2212,7 +2254,8 @@ const CompanyForm: React.FC = () => {
               <div>
                 <label htmlFor="subdomain" className="block text-sm font-medium text-gray-700 mb-2">
                   Subdomain {!id && <span className="text-red-500">*</span>}
-                  {id && <span className="text-gray-500 text-xs">(Cannot be changed once set)</span>}
+                  {id && originalSubdomain && <span className="text-gray-500 text-xs">(Cannot be changed once set)</span>}
+                  {id && !originalSubdomain && <span className="text-gray-500 text-xs">(Can be set now, cannot be changed once set)</span>}
                 </label>
                 {originalSubdomain ? (
                   <div>
