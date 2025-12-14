@@ -1561,6 +1561,80 @@ const CompanyForm: React.FC = () => {
     });
   }, [triggerFilePicker]);
 
+  // Special handler for video uploads - uploads file to server instead of base64
+  const handleVideoUpload = useCallback(async () => {
+    if (!id) {
+      toast.error('Company ID is required');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*';
+    
+    const cleanup = () => {
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
+    };
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        cleanup();
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv'];
+      const allowedExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'];
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      
+      if (!allowedTypes.includes(file.type.toLowerCase()) && !allowedExtensions.includes(fileExtension)) {
+        toast.error(`Invalid video type. Allowed types: ${allowedExtensions.join(', ')}`);
+        cleanup();
+        return;
+      }
+
+      // Validate file size (500 MB max)
+      const maxSizeBytes = 500 * 1024 * 1024; // 500 MB
+      if (file.size > maxSizeBytes) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        toast.error(`Video is too large (${fileSizeMB}MB). Maximum allowed size is 500MB.`);
+        cleanup();
+        return;
+      }
+
+      try {
+        // Show uploading state
+        toast.info('Uploading video...', { autoClose: false });
+        
+        // Upload video to server
+        const videoUrl = await companyService.uploadVideo(id, file);
+        
+        // Update form data with the URL from server
+        // The URL returned is absolute, which is fine for both preview and saving
+        setFormData(prev => ({
+          ...prev,
+          videoLink: videoUrl
+        }));
+        
+        toast.dismiss();
+        toast.success('Video uploaded successfully!');
+      } catch (error: any) {
+        console.error('Failed to upload video:', error);
+        toast.dismiss();
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to upload video';
+        toast.error(`Upload failed: ${errorMessage}`);
+      } finally {
+        cleanup();
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+  }, [id]);
+
   const handleMediaClear = useCallback((field: MediaFieldKey) => {
     setFormData(prev => ({
       ...prev,
@@ -2605,7 +2679,7 @@ const CompanyForm: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleMediaUpload('videoLink', 'video/*')}
+                      onClick={handleVideoUpload}
                       className="px-3 py-2 text-sm border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50"
                     >
                       Upload

@@ -146,6 +146,42 @@ class CompanyService {
       throw error;
     }
   }
+
+  /**
+   * Upload a video file for a company
+   */
+  async uploadVideo(companyId: string, videoFile: File): Promise<string> {
+    try {
+      const formData = new FormData();
+      formData.append('video', videoFile);
+
+      const response = await api.post(`/media/companies/${companyId}/video`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 600000, // 10 minutes timeout for large video uploads
+      });
+
+      // API returns { videoUrl, fileName, fileSize, message } or wrapped in { result: { videoUrl, ... } }
+      const result = response.data.result || response.data;
+      const videoUrl = result.videoUrl || result;
+      
+      if (!videoUrl || typeof videoUrl !== 'string') {
+        throw new Error('Invalid response: videoUrl not found');
+      }
+      
+      // Ensure URL is absolute (prepend base URL if relative)
+      if (videoUrl.startsWith('/')) {
+        const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net';
+        return `${baseUrl}${videoUrl}`;
+      }
+      
+      return videoUrl;
+    } catch (error) {
+      console.error(`Failed to upload video for company ${companyId}:`, error);
+      throw error;
+    }
+  }
 }
 
 const companyService = new CompanyService();
