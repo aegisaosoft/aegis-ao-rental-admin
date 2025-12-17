@@ -1635,12 +1635,27 @@ const CompanyForm: React.FC = () => {
     input.click();
   }, [id]);
 
-  const handleMediaClear = useCallback((field: MediaFieldKey) => {
+  const handleMediaClear = useCallback(async (field: MediaFieldKey) => {
+    // If clearing video and company exists, call delete API
+    if (field === 'videoLink' && id && formData.videoLink) {
+      try {
+        await companyService.deleteVideo(id);
+        toast.success('Video deleted successfully');
+      } catch (error: any) {
+        console.error('Failed to delete video:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to delete video';
+        toast.error(`Failed to delete video: ${errorMessage}`);
+        // Don't clear the form data if deletion failed
+        return;
+      }
+    }
+    
+    // Clear the field from form data
     setFormData(prev => ({
       ...prev,
       [field]: ''
     }));
-  }, []);
+  }, [id, formData.videoLink]);
 
   // Translate all untranslated fields - uses source language if it has content, otherwise finds best available source
   const translateSections = useCallback(async (

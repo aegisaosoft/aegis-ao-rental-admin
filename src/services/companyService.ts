@@ -182,6 +182,18 @@ class CompanyService {
       throw error;
     }
   }
+
+  /**
+   * Delete a company's video
+   */
+  async deleteVideo(companyId: string): Promise<void> {
+    try {
+      await api.delete(`/media/companies/${companyId}/video`);
+    } catch (error) {
+      console.error(`Failed to delete video for company ${companyId}:`, error);
+      throw error;
+    }
+  }
 }
 
 const companyService = new CompanyService();
