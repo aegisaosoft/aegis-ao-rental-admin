@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Building2, CreditCard } from 'lucide-react';
+import { Settings, Building2, CreditCard, Car } from 'lucide-react';
 import Layout from '../components/Layout';
 
 const Dashboard = () => {
@@ -40,13 +40,21 @@ const Dashboard = () => {
         <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button 
+            <button
               onClick={() => navigate('/companies')}
               className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors"
             >
               <Building2 className="h-6 w-6 text-blue-600 mb-2" />
               <p className="font-medium text-gray-900">Companies</p>
               <p className="text-sm text-gray-500">Manage rental companies</p>
+            </button>
+            <button
+              onClick={() => navigate('/vehicles')}
+              className="p-4 border border-gray-300 rounded-lg hover:bg-gray-50 text-left transition-colors"
+            >
+              <Car className="h-6 w-6 text-blue-600 mb-2" />
+              <p className="font-medium text-gray-900">Vehicles</p>
+              <p className="text-sm text-gray-500">Make models & images</p>
             </button>
             {canAccessSettings && (
               <button 

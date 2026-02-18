@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import CompanyList from './pages/CompanyList';
 import CompanyForm from './pages/CompanyForm';
 import VehicleLocations from './pages/VehicleLocations';
+import Vehicles from './pages/Vehicles';
 import ScrollToTop from './components/ScrollToTop';
 import Settings from './pages/Settings';
 import StripeSettings from './pages/StripeSettings';
@@ -135,6 +136,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StripeSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicles"
+            element={
+              <ProtectedRoute>
+                <Vehicles />
               </ProtectedRoute>
             }
           />

@@ -54,6 +54,7 @@
       "last 1 safari version"
     ]
   },
+  "proxy": "https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net",
   "devDependencies": {
     "@types/react-toastify": "^4.0.2",
     "autoprefixer": "^10.4.21",

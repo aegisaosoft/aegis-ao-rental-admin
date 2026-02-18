@@ -67,13 +67,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button
                   onClick={() => navigate('/companies')}
                   className={`flex items-center gap-2 px-3 py-2 rounded transition ${
-                    pathname.startsWith('/companies') 
-                      ? 'bg-blue-700 text-white' 
+                    pathname.startsWith('/companies')
+                      ? 'bg-blue-700 text-white'
                       : 'text-blue-100 hover:bg-blue-700 hover:text-white'
                   }`}
                 >
                   <Building2 className="h-4 w-4" />
                   <span className="text-sm font-medium">Companies</span>
+                </button>
+                <button
+                  onClick={() => navigate('/vehicles')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded transition ${
+                    pathname === '/vehicles'
+                      ? 'bg-blue-700 text-white'
+                      : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                  }`}
+                >
+                  <Car className="h-4 w-4" />
+                  <span className="text-sm font-medium">Vehicles</span>
                 </button>
                 {canAccessSettings && (
                   <button

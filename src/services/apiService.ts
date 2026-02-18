@@ -42,6 +42,30 @@ class ApiService {
     const response = await api.put(`/vehicles/${vehicleId}`, updateData);
     return response.data.result || response.data;
   }
+
+  async getAllModels(): Promise<ModelItem[]> {
+    const response = await api.get('/models');
+    const data = response.data.result || response.data;
+    return Array.isArray(data) ? data : [];
+  }
+}
+
+export interface ModelItem {
+  id: string;
+  make: string;
+  modelName: string;
+  year: number;
+  fuelType: string | null;
+  transmission: string | null;
+  seats: number | null;
+  dailyRate: number | null;
+  features: string[] | null;
+  description: string | null;
+  imageUrl: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  vehicleCount: number;
+  availableCount: number;
 }
 
 const apiService = new ApiService();
