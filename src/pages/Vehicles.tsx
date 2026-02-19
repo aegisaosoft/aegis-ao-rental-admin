@@ -523,10 +523,10 @@ const Vehicles: React.FC = () => {
   });
 
   // Sync page changes to URL
+  const currentPageIndex = table.getState().pagination.pageIndex;
   useEffect(() => {
-    const pageIndex = table.getState().pagination.pageIndex;
-    setUrlState({ page: pageIndex > 0 ? String(pageIndex) : null });
-  }, [table.getState().pagination.pageIndex]);
+    setUrlState({ page: currentPageIndex > 0 ? String(currentPageIndex) : null });
+  }, [currentPageIndex, setUrlState]);
 
   const handleRefresh = () => {
     setRows((prev) => prev.map((r) => ({ ...r, imageExists: null, imageSize: null })));
