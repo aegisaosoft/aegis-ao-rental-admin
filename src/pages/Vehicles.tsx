@@ -526,7 +526,7 @@ const Vehicles: React.FC = () => {
   const currentPageIndex = table.getState().pagination.pageIndex;
   useEffect(() => {
     setUrlState({ page: currentPageIndex > 0 ? String(currentPageIndex) : null });
-  }, [currentPageIndex, setUrlState]);
+  }, [currentPageIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefresh = () => {
     setRows((prev) => prev.map((r) => ({ ...r, imageExists: null, imageSize: null })));
