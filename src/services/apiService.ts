@@ -48,6 +48,39 @@ class ApiService {
     const data = response.data.result || response.data;
     return Array.isArray(data) ? data : [];
   }
+
+  async getCategories(): Promise<VehicleCategory[]> {
+    const response = await api.get('/vehicles/categories');
+    const data = response.data.result || response.data;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async updateModelCategory(modelId: string, categoryId: string | null) {
+    const response = await api.put(`/models/${modelId}/category`, { categoryId });
+    return response.data.result || response.data;
+  }
+
+  async startCarImageSearch(make: string, model: string, maxResults: number = 16): Promise<string> {
+    const response = await api.post('/car-images/search', { make, model, maxResults });
+    const data = response.data.result || response.data;
+    return data.jobId;
+  }
+
+  async getCarImageSearchStatus(jobId: string): Promise<CarSearchJobStatus> {
+    const response = await api.get(`/car-images/search/status/${jobId}`);
+    return response.data.result || response.data;
+  }
+
+  async processCarImage(make: string, model: string, sourceImageUrl: string): Promise<CarProcessResult> {
+    const response = await api.post('/car-images/process', { make, model, sourceImageUrl });
+    return response.data.result || response.data;
+  }
+}
+
+export interface VehicleCategory {
+  id: string;
+  categoryName: string;
+  description: string | null;
 }
 
 export interface ModelItem {
@@ -66,6 +99,30 @@ export interface ModelItem {
   categoryName: string | null;
   vehicleCount: number;
   availableCount: number;
+}
+
+export interface CarSearchResult {
+  id: string;
+  thumbnailUrl: string;
+  sourceUrl: string;
+  make: string;
+  model: string;
+  source: string; // "cars.com" | "google"
+}
+
+export interface CarProcessResult {
+  blobUrl: string;
+  fileName: string;
+  status: string;
+}
+
+export interface CarSearchJobStatus {
+  jobId: string;
+  status: string; // pending, searching_cars, searching_google, completed, error
+  message: string;
+  foundCount: number;
+  results: CarSearchResult[];
+  elapsedSeconds: number;
 }
 
 const apiService = new ApiService();

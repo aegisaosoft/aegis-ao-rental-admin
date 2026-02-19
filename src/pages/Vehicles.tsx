@@ -9,27 +9,31 @@ import {
   ColumnDef,
   SortingState,
 } from '@tanstack/react-table';
+import { toast } from 'react-toastify';
 import apiService from '../services/apiService';
-import { Car, ChevronLeft, ChevronRight, Image, ImageOff, Filter, RefreshCw } from 'lucide-react';
+import type { VehicleCategory } from '../services/apiService';
+import { Car, ChevronLeft, ChevronRight, Image, ImageOff, Filter, RefreshCw, Search } from 'lucide-react';
 import Layout from '../components/Layout';
+import CarImageSearchPanel from './CarImageSearchPanel';
 
 const BLOB_BASE = 'https://aegisaorentalstorage.blob.core.windows.net/models';
 
-type ImageFilter = 'all' | 'with_image' | 'without_image';
+type ImageFilter = 'all' | 'with_image' | 'without_image' | 'no_category';
 
-// Уникальная запись Make+Model с агрегацией по годам
 interface MakeModelRow {
-  key: string; // MAKE_MODEL
+  key: string;
   make: string;
   modelName: string;
   years: number[];
+  modelIds: string[]; // все id моделей в этой группе
+  categoryId: string | null;
   categoryName: string | null;
   fuelType: string | null;
   transmission: string | null;
   seats: number | null;
   blobUrl: string;
-  imageExists: boolean | null; // null = loading
-  imageSize: number | null; // bytes
+  imageExists: boolean | null;
+  imageSize: number | null;
 }
 
 function buildBlobUrl(make: string, model: string): string {
@@ -44,27 +48,124 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// Компонент дропдауна категории
+const CategorySelect: React.FC<{
+  row: MakeModelRow;
+  categories: VehicleCategory[];
+  onCategoryChange: (row: MakeModelRow, categoryId: string | null) => Promise<void>;
+}> = ({ row, categories, onCategoryChange }) => {
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    const newCategoryId = val === '' ? null : val;
+    setSaving(true);
+    try {
+      await onCategoryChange(row, newCategoryId);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <select
+      value={row.categoryId || ''}
+      onChange={handleChange}
+      disabled={saving}
+      className={`text-xs border rounded px-2 py-1 w-full max-w-[160px] ${
+        saving ? 'opacity-50 cursor-wait' : 'cursor-pointer'
+      } ${
+        row.categoryId
+          ? 'border-blue-300 bg-blue-50 text-blue-800'
+          : 'border-gray-300 bg-white text-gray-500'
+      }`}
+    >
+      <option value="">— No category —</option>
+      {categories.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.categoryName}
+        </option>
+      ))}
+    </select>
+  );
+};
+
+// Read initial state from URL search params
+function getUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    filter: (params.get('filter') as ImageFilter) || 'without_image',
+    search: params.get('q') || '',
+    page: parseInt(params.get('page') || '0', 10),
+    sortId: params.get('sortBy') || '',
+    sortDesc: params.get('sortDir') === 'desc',
+  };
+}
+
+function setUrlState(updates: Record<string, string | null>) {
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null || value === '' || value === '0') {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+  }
+  const qs = params.toString();
+  const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+  window.history.replaceState(null, '', newUrl);
+}
+
 const Vehicles: React.FC = () => {
+  const urlState = useMemo(() => getUrlState(), []);
+
   const [rows, setRows] = useState<MakeModelRow[]>([]);
+  const [categories, setCategories] = useState<VehicleCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingImages, setCheckingImages] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [imageFilter, setImageFilter] = useState<ImageFilter>('all');
+  const [sorting, setSorting] = useState<SortingState>(
+    urlState.sortId ? [{ id: urlState.sortId, desc: urlState.sortDesc }] : []
+  );
+  const [globalFilter, setGlobalFilter] = useState(urlState.search);
+  const [imageFilter, setImageFilter] = useState<ImageFilter>(urlState.filter);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [searchPanelRow, setSearchPanelRow] = useState<MakeModelRow | null>(null);
+  const [initialPage] = useState(urlState.page);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 1. Загрузить модели из API, сгруппировать по Make+Model
-  const loadModels = useCallback(async () => {
+  // Sync state changes to URL
+  useEffect(() => {
+    setUrlState({ filter: imageFilter === 'without_image' ? null : imageFilter });
+  }, [imageFilter]);
+
+  useEffect(() => {
+    setUrlState({ q: globalFilter || null });
+  }, [globalFilter]);
+
+  useEffect(() => {
+    if (sorting.length > 0) {
+      setUrlState({ sortBy: sorting[0].id, sortDir: sorting[0].desc ? 'desc' : 'asc' });
+    } else {
+      setUrlState({ sortBy: null, sortDir: null });
+    }
+  }, [sorting]);
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.getAllModels();
 
-      // Группируем по Make+Model (верхний регистр)
+      const [modelsData, categoriesData] = await Promise.all([
+        apiService.getAllModels(),
+        apiService.getCategories(),
+      ]);
+
+      setCategories(categoriesData);
+
+      // Группируем по Make+Model
       const map = new Map<string, MakeModelRow>();
-      for (const m of data) {
+      for (const m of modelsData) {
         const makeUp = (m.make || '').toUpperCase().trim();
         const modelUp = (m.modelName || '').toUpperCase().trim();
         const key = `${makeUp}_${modelUp}`;
@@ -74,12 +175,17 @@ const Vehicles: React.FC = () => {
             existing.years.push(m.year);
             existing.years.sort((a, b) => b - a);
           }
+          if (!existing.modelIds.includes(m.id)) {
+            existing.modelIds.push(m.id);
+          }
         } else {
           map.set(key, {
             key,
             make: makeUp,
             modelName: modelUp,
             years: [m.year],
+            modelIds: [m.id],
+            categoryId: m.categoryId,
             categoryName: m.categoryName,
             fuelType: m.fuelType,
             transmission: m.transmission,
@@ -96,37 +202,29 @@ const Vehicles: React.FC = () => {
       );
       setRows(rowList);
     } catch (err: any) {
-      console.error('Failed to load models:', err);
-      setError(err.message || 'Failed to load models');
+      console.error('Failed to load data:', err);
+      setError(err.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 2. Проверить существование картинок через HEAD-запросы
+  // Проверка картинок через HEAD
   const checkImages = useCallback(async (rowList: MakeModelRow[]) => {
     if (rowList.length === 0) return;
-
-    // Прерываем предыдущую проверку
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-
     setCheckingImages(true);
 
-    // Проверяем батчами по 5 параллельно
     const batchSize = 5;
     for (let i = 0; i < rowList.length; i += batchSize) {
       if (controller.signal.aborted) break;
-
       const batch = rowList.slice(i, i + batchSize);
       const results = await Promise.allSettled(
         batch.map(async (row) => {
           try {
-            const resp = await fetch(row.blobUrl, {
-              method: 'HEAD',
-              signal: controller.signal,
-            });
+            const resp = await fetch(row.blobUrl, { method: 'HEAD', signal: controller.signal });
             return {
               key: row.key,
               exists: resp.ok,
@@ -137,10 +235,7 @@ const Vehicles: React.FC = () => {
           }
         })
       );
-
       if (controller.signal.aborted) break;
-
-      // Обновляем состояние инкрементально
       setRows((prev) => {
         const updated = [...prev];
         for (const result of results) {
@@ -158,25 +253,70 @@ const Vehicles: React.FC = () => {
         return updated;
       });
     }
-
     setCheckingImages(false);
   }, []);
 
-  useEffect(() => {
-    loadModels();
-  }, [loadModels]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Запускаем проверку картинок после загрузки
   useEffect(() => {
     if (rows.length > 0 && rows.some((r) => r.imageExists === null)) {
       checkImages(rows);
     }
   }, [rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Фильтрация по наличию картинки
+  // Обработчик смены категории — обновляет все модели в группе
+  const handleCategoryChange = useCallback(async (row: MakeModelRow, categoryId: string | null) => {
+    try {
+      // Обновляем все model id в этой группе
+      await Promise.all(row.modelIds.map((id) => apiService.updateModelCategory(id, categoryId)));
+
+      const catName = categories.find((c) => c.id === categoryId)?.categoryName || null;
+
+      setRows((prev) =>
+        prev.map((r) =>
+          r.key === row.key ? { ...r, categoryId, categoryName: catName } : r
+        )
+      );
+      toast.success(`Category updated for ${row.make} ${row.modelName}`);
+    } catch (err: any) {
+      console.error('Failed to update category:', err);
+      toast.error(`Failed to update category: ${err.message}`);
+    }
+  }, [categories]);
+
+  const handleImageUploaded = useCallback((blobUrl: string) => {
+    // Обновляем статус строки — картинка теперь есть
+    if (searchPanelRow) {
+      setRows((prev) =>
+        prev.map((r) =>
+          r.key === searchPanelRow.key
+            ? { ...r, imageExists: true, imageSize: null, blobUrl: blobUrl || r.blobUrl }
+            : r
+        )
+      );
+      // Re-check this one image to get size
+      const rowToCheck = rows.find((r) => r.key === searchPanelRow.key);
+      if (rowToCheck) {
+        fetch(rowToCheck.blobUrl, { method: 'HEAD' })
+          .then((resp) => {
+            if (resp.ok) {
+              const size = parseInt(resp.headers.get('content-length') || '0', 10);
+              setRows((prev) =>
+                prev.map((r) =>
+                  r.key === searchPanelRow.key ? { ...r, imageSize: size } : r
+                )
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [searchPanelRow, rows]);
+
   const filteredRows = useMemo(() => {
     if (imageFilter === 'with_image') return rows.filter((r) => r.imageExists === true);
     if (imageFilter === 'without_image') return rows.filter((r) => r.imageExists === false);
+    if (imageFilter === 'no_category') return rows.filter((r) => !r.categoryId);
     return rows;
   }, [rows, imageFilter]);
 
@@ -199,8 +339,9 @@ const Vehicles: React.FC = () => {
     const withImage = rows.filter((r) => r.imageExists === true).length;
     const withoutImage = rows.filter((r) => r.imageExists === false).length;
     const checking = rows.filter((r) => r.imageExists === null).length;
+    const noCategory = rows.filter((r) => !r.categoryId).length;
     const totalSize = rows.reduce((sum, r) => sum + (r.imageSize || 0), 0);
-    return { total, withImage, withoutImage, checking, totalSize };
+    return { total, withImage, withoutImage, checking, noCategory, totalSize };
   }, [rows]);
 
   const columns = useMemo<ColumnDef<MakeModelRow>[]>(
@@ -285,25 +426,20 @@ const Vehicles: React.FC = () => {
       {
         accessorKey: 'categoryName',
         header: 'Category',
-        cell: (info) => {
-          const val = info.getValue() as string | null;
-          return val ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-              {val}
-            </span>
-          ) : (
-            <span className="text-gray-400 text-sm">&mdash;</span>
-          );
-        },
+        cell: (info) => (
+          <CategorySelect
+            row={info.row.original}
+            categories={categories}
+            onCategoryChange={handleCategoryChange}
+          />
+        ),
       },
       {
         id: 'imageStatus',
         header: 'Image Status',
         cell: (info) => {
           const row = info.row.original;
-          if (row.imageExists === null) {
-            return <span className="text-gray-400 text-xs">Checking...</span>;
-          }
+          if (row.imageExists === null) return <span className="text-gray-400 text-xs">Checking...</span>;
           if (row.imageExists) {
             return (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
@@ -326,8 +462,7 @@ const Vehicles: React.FC = () => {
         header: 'Size',
         cell: (info) => {
           const row = info.row.original;
-          if (row.imageExists === null) return <span className="text-gray-400 text-xs">&mdash;</span>;
-          if (!row.imageExists) return <span className="text-gray-400 text-xs">&mdash;</span>;
+          if (row.imageExists === null || !row.imageExists) return <span className="text-gray-400 text-xs">&mdash;</span>;
           return (
             <span className="text-gray-700 text-sm font-mono">
               {row.imageSize ? formatBytes(row.imageSize) : '?'}
@@ -350,8 +485,27 @@ const Vehicles: React.FC = () => {
         },
         enableSorting: false,
       },
+      {
+        id: 'actions',
+        header: '',
+        cell: (info) => (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSearchPanelRow(info.row.original);
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition"
+            title="Find images on cars.com"
+          >
+            <Search className="h-3 w-3" />
+            Find
+          </button>
+        ),
+        size: 70,
+        enableSorting: false,
+      },
     ],
-    [selectedKeys, filteredRows.length, toggleSelect, toggleSelectAll]
+    [selectedKeys, filteredRows.length, toggleSelect, toggleSelectAll, categories, handleCategoryChange]
   );
 
   const table = useReactTable({
@@ -364,12 +518,18 @@ const Vehicles: React.FC = () => {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 25 } },
+    autoResetPageIndex: false, // Don't reset page on data changes (category update, image check, etc.)
+    initialState: { pagination: { pageSize: 25, pageIndex: initialPage } },
   });
+
+  // Sync page changes to URL
+  useEffect(() => {
+    const pageIndex = table.getState().pagination.pageIndex;
+    setUrlState({ page: pageIndex > 0 ? String(pageIndex) : null });
+  }, [table.getState().pagination.pageIndex]);
 
   const handleRefresh = () => {
     setRows((prev) => prev.map((r) => ({ ...r, imageExists: null, imageSize: null })));
-    // checkImages будет вызван через useEffect
   };
 
   if (loading) {
@@ -391,10 +551,7 @@ const Vehicles: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <p className="text-red-700 font-medium">Error: {error}</p>
-            <button
-              onClick={loadModels}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-            >
+            <button onClick={loadData} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
               Retry
             </button>
           </div>
@@ -412,19 +569,31 @@ const Vehicles: React.FC = () => {
             <Car className="h-7 w-7 text-blue-600" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Vehicles &mdash; Make / Models</h1>
-              <p className="text-sm text-gray-500">
-                Blob images: {BLOB_BASE}/MAKE_MODEL.png
-              </p>
+              <p className="text-sm text-gray-500">Blob images: {BLOB_BASE}/MAKE_MODEL.png</p>
             </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={checkingImages}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
-          >
-            <RefreshCw className={`h-4 w-4 ${checkingImages ? 'animate-spin' : ''}`} />
-            Re-check images
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedKeys.size === 1 && (() => {
+              const selectedRow = filteredRows.find((r) => selectedKeys.has(r.key));
+              return selectedRow ? (
+                <button
+                  onClick={() => setSearchPanelRow(selectedRow)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  <Search className="h-4 w-4" />
+                  Find Images
+                </button>
+              ) : null;
+            })()}
+            <button
+              onClick={handleRefresh}
+              disabled={checkingImages}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              <RefreshCw className={`h-4 w-4 ${checkingImages ? 'animate-spin' : ''}`} />
+              Re-check images
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -436,9 +605,7 @@ const Vehicles: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-green-200 p-4">
             <p className="text-xs text-green-600 uppercase tracking-wide">With Image</p>
             <p className="text-2xl font-bold text-green-600 mt-1">{stats.withImage}</p>
-            {stats.totalSize > 0 && (
-              <p className="text-xs text-gray-400 mt-1">Total: {formatBytes(stats.totalSize)}</p>
-            )}
+            {stats.totalSize > 0 && <p className="text-xs text-gray-400 mt-1">Total: {formatBytes(stats.totalSize)}</p>}
           </div>
           <div className="bg-white rounded-lg shadow-sm border border-red-200 p-4">
             <p className="text-xs text-red-600 uppercase tracking-wide">Missing Image</p>
@@ -464,23 +631,18 @@ const Vehicles: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-gray-500" />
               <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                 <button
                   onClick={() => setImageFilter('all')}
-                  className={`px-3 py-2 text-sm font-medium transition ${
-                    imageFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-2 text-sm font-medium transition ${imageFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                 >
                   All ({stats.total})
                 </button>
                 <button
                   onClick={() => setImageFilter('with_image')}
-                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${
-                    imageFilter === 'with_image' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${imageFilter === 'with_image' ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                 >
                   <span className="flex items-center gap-1">
                     <Image className="h-3.5 w-3.5" />
@@ -489,18 +651,21 @@ const Vehicles: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setImageFilter('without_image')}
-                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${
-                    imageFilter === 'without_image' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${imageFilter === 'without_image' ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                 >
                   <span className="flex items-center gap-1">
                     <ImageOff className="h-3.5 w-3.5" />
                     No Image ({stats.withoutImage})
                   </span>
                 </button>
+                <button
+                  onClick={() => setImageFilter('no_category')}
+                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 transition ${imageFilter === 'no_category' ? 'bg-orange-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                  No Category ({stats.noCategory})
+                </button>
               </div>
             </div>
-
             {selectedKeys.size > 0 && (
               <span className="text-sm text-blue-600 font-medium">{selectedKeys.size} selected</span>
             )}
@@ -517,9 +682,7 @@ const Vehicles: React.FC = () => {
                     {hg.headers.map((header) => (
                       <th
                         key={header.id}
-                        className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                          header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-gray-100' : ''
-                        }`}
+                        className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header.column.getCanSort() ? 'cursor-pointer select-none hover:bg-gray-100' : ''}`}
                         onClick={header.column.getToggleSortingHandler()}
                         style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                       >
@@ -544,9 +707,7 @@ const Vehicles: React.FC = () => {
                   table.getRowModel().rows.map((row) => (
                     <tr
                       key={row.id}
-                      className={`hover:bg-gray-50 transition ${
-                        selectedKeys.has(row.original.key) ? 'bg-blue-50' : ''
-                      }`}
+                      className={`hover:bg-gray-50 transition ${selectedKeys.has(row.original.key) ? 'bg-blue-50' : ''}`}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <td key={cell.id} className="px-4 py-2.5 whitespace-nowrap">
@@ -566,15 +727,13 @@ const Vehicles: React.FC = () => {
               Showing{' '}
               <span className="font-medium">
                 {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}
-              </span>{' '}
-              to{' '}
+              </span>{' '}to{' '}
               <span className="font-medium">
                 {Math.min(
                   (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
                   filteredRows.length
                 )}
-              </span>{' '}
-              of <span className="font-medium">{filteredRows.length}</span>
+              </span>{' '}of <span className="font-medium">{filteredRows.length}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -598,6 +757,16 @@ const Vehicles: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Car Image Search Panel (slide-over) */}
+      {searchPanelRow && (
+        <CarImageSearchPanel
+          make={searchPanelRow.make}
+          model={searchPanelRow.modelName}
+          onClose={() => setSearchPanelRow(null)}
+          onImageUploaded={handleImageUploaded}
+        />
+      )}
     </Layout>
   );
 };
