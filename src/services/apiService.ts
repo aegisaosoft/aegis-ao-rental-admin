@@ -72,7 +72,9 @@ class ApiService {
   }
 
   async processCarImage(make: string, model: string, sourceImageUrl: string): Promise<CarProcessResult> {
-    const response = await api.post('/car-images/process', { make, model, sourceImageUrl });
+    const response = await api.post('/car-images/process', { make, model, sourceImageUrl }, {
+      timeout: 120000, // 2 минуты — обработка изображений (скачивание + Python + Azure Blob)
+    });
     return response.data.result || response.data;
   }
 }
