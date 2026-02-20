@@ -6,7 +6,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 // API Base URL - constant, doesn't need to be in component
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net/api';
+const envUrl = process.env.REACT_APP_API_URL;
+const API_BASE_URL = envUrl ? `${envUrl.replace(/\/+$/, '')}/api` : 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net/api';
 
 const SetNewClient: React.FC = () => {
   const [searchParams] = useSearchParams();

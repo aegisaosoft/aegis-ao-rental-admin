@@ -172,7 +172,7 @@ class CompanyService {
       
       // Ensure URL is absolute (prepend base URL if relative)
       if (videoUrl.startsWith('/')) {
-        const baseUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net';
+        const baseUrl = (process.env.REACT_APP_API_URL || 'https://aegis-ao-rental-h4hda5gmengyhyc9.canadacentral-01.azurewebsites.net').replace(/\/+$/, '');
         return `${baseUrl}${videoUrl}`;
       }
       
